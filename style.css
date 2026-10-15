@@ -445,30 +445,86 @@ select {
 }
 
 /* ===== 13. RESPONSIVE ===== */
+
+/* Bouton burger : caché sur ordinateur */
+.menu-toggle {
+    display: none;
+    font-size: 18px;
+}
+
+/* Pas de menu vide (ex. page de connexion) : on cache le burger */
+.topbar:has(nav:empty) .menu-toggle { display: none !important; }
+
 @media (max-width: 1024px) {
     .container { padding: 40px 30px; }
+    .topbar { padding: 0 30px; gap: 24px; }
 }
 
 @media (max-width: 768px) {
     .topbar {
-        flex-wrap: wrap;
-        gap: 14px;
-        padding: 16px 20px;
+        padding: 0 16px;
+        min-height: 60px;
+        gap: 12px;
     }
-    nav { order: 3; width: 100%; gap: 20px; justify-content: center; }
+
+    /* Disposition : marque à gauche, actions et burger à droite */
+    .brand { flex: 1; font-size: 20px; }
+    .top-actions { order: 2; gap: 8px; }
+    .menu-toggle { display: inline-flex; order: 3; }
+
+    /* Menu déroulant sous la barre */
+    nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 8px 0;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    }
+    nav.open { display: flex; animation: slideIn 0.2s ease; }
+    nav a {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        border-left: 3px solid transparent;
+    }
+    nav a:last-child { border-bottom: none; }
+    nav a.active {
+        border-bottom: 1px solid var(--border);
+        border-left-color: var(--accent);
+        background: var(--bg-alt);
+    }
+
     .container { padding: 30px 20px; }
     h1 { font-size: 26px; }
     .page-head { margin-bottom: 30px; }
     .grid.two { grid-template-columns: 1fr; }
     .auth { padding: 36px 26px; margin: 24px auto; }
     .auth h1 { font-size: 30px; }
+    .stats { grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { padding: 24px; }
+    .btn { padding: 12px 18px; }
+    .toast { left: 16px; right: 16px; bottom: 16px; max-width: none; }
 }
 
 @media (max-width: 480px) {
     .row-2 { grid-template-columns: 1fr; }
-    .row-card { flex-direction: column; align-items: flex-start; }
-    .card { padding: 22px; }
+    .row-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .row-card:hover { transform: none; }
+    .stats { grid-template-columns: 1fr; }
     .stat strong { font-size: 30px; }
+    .card { padding: 20px; }
+    .container { padding: 24px 16px; }
+    .actions .btn { flex: 1 1 100%; }
+    .auth { padding: 30px 20px; }
+    .auth h1 { font-size: 26px; }
+    .auth h1 { margin-bottom: 26px; }
+    .track-panel .track-form .btn { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -477,3 +533,4 @@ select {
         animation: none !important;
     }
 }
+
