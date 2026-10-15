@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DJ Booking</title>
+  <!-- Évite le flash au chargement : applique le thème avant le rendu -->
+  <script>
+    document.documentElement.dataset.theme =
+      localStorage.getItem('theme') ||
+      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  </script>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">DJ<span>Booking</span></a>
+    <nav id="nav"></nav>
+    <div class="top-actions">
+      <button id="theme-toggle" class="icon-btn" aria-label="Changer le thème"></button>
+      <button id="logout" class="btn small hidden">Déconnexion</button>
+    </div>
+  </header>
+
+  <main id="app" class="container"></main>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
