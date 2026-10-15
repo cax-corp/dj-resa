@@ -371,6 +371,23 @@ async function renderDjProfile() {
   };
 }
 
+// ================= MENU BURGER (MOBILE) =================
+const menuBtn = $('#menu-toggle');
+const navEl = $('#nav');
+
+function setMenu(open) {
+  navEl.classList.toggle('open', open);
+  menuBtn.setAttribute('aria-expanded', String(open));
+  menuBtn.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
+  menuBtn.textContent = open ? '✕' : '☰';
+}
+
+menuBtn.onclick = () => setMenu(!navEl.classList.contains('open'));
+// Ferme le menu après un clic sur un lien
+navEl.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
+window.addEventListener('hashchange', () => setMenu(false));
+window.addEventListener('resize', () => { if (window.innerWidth > 768) setMenu(false); });
+
 // ================= BOOT =================
 $('#theme-toggle').onclick = () =>
   setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
