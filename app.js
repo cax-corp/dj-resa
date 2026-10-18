@@ -166,6 +166,9 @@ const settingsBlock = (s) => `
     </form>
   </section>`;
 
+const rateOpts = (sel) => Object.entries(RATE_UNITS)
+  .map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${l}</option>`).join('');
+
 const ratesBlock = (plans) => `
   <section class="card" style="margin-top:25px">
     <h2>Tarifs de base</h2>
@@ -189,9 +192,6 @@ const ratesBlock = (plans) => `
       <div class="rate-actions"><button class="btn small primary">Ajouter</button></div>
     </form>
   </section>`;
-
-const rateOpts = (sel) => Object.entries(RATE_UNITS)
-  .map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${l}</option>`).join('');
 
 async function renderAccount() {
   const isAdmin = me.role === 'admin';
