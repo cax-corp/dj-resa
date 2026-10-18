@@ -294,6 +294,7 @@ async function renderProject(id, isAdmin) {
     </div>
 
     <div class="grid two">${infoBlock}${updatesBlock}</div>
+    ${mapCard(p.location)}
 
     <div class="grid two" style="margin-top:25px">
       ${trackPanel('must_play', 'À passer absolument', must, canEdit)}
