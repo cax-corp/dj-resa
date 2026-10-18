@@ -26,7 +26,6 @@ const info = (label, value) => `
   <div class="info-item"><span>${label}</span><strong>${value}</strong></div>`;
 const ERR = (e) => toast(e?.message || 'Une erreur est survenue', false);
 
-// Exécute une requête Supabase et affiche l'erreur éventuelle
 async function run(promise, okMsg) {
   const { error } = await promise;
   if (error) { ERR(error); return false; }
@@ -49,6 +48,18 @@ const SCHEDULE_KIND = {
   arrivee: 'Arrivée', installation: 'Installation', set: 'Set', pause: 'Pause',
   repas: 'Repas', ceremonie: 'Cérémonie', autre: 'Autre'
 };
+const RATE_UNITS = { forfait: 'Forfait', heure: "À l'heure" };
+const SETTINGS_FIELDS = [
+  ['company_name', "Nom de l'entreprise ou nom commercial"],
+  ['owner_name', 'Nom du responsable'],
+  ['address', 'Adresse', 'textarea'],
+  ['siret', 'SIRET'],
+  ['email', 'Email'],
+  ['phone', 'Téléphone'],
+  ['iban', 'IBAN'],
+  ['tva_mention', 'Mention TVA (ex. TVA non applicable, art. 293 B du CGI)', 'textarea'],
+  ['footer', 'Pied de page (conditions, remerciements)', 'textarea']
+];
 
 // ================= THÈME =================
 function setTheme(t) {
@@ -91,6 +102,7 @@ function renderHeader() {
 }
 
 async function route() {
+  document.body.dataset.view = '';
   try {
     await loadMe();
     renderHeader();
@@ -103,6 +115,7 @@ async function route() {
 
 async function dispatch({ a, b, c, params }) {
   if (a === 'compte') return renderAccount();
+  if (a === 'factures' && b) return renderInvoice(b);
 
   if (me.role === 'admin') {
     if (a !== 'admin') return go('admin');
@@ -140,18 +153,74 @@ function renderLogin() {
 }
 
 // ================= MON COMPTE =================
-function renderAccount() {
+const settingsBlock = (s) => `
+  <section class="card" style="margin-top:25px">
+    <h2>Émetteur des factures</h2>
+    <form id="settings-form" class="stack">
+      <div class="row-2">
+        ${SETTINGS_FIELDS.map(([k, l, t]) => t === 'textarea'
+          ? `<label class="span-2">${l}<textarea name="${k}" rows="3">${esc(s[k] || '')}</textarea></label>`
+          : `<label>${l}<input name="${k}" value="${esc(s[k] || '')}"></label>`).join('')}
+      </div>
+      <button class="btn primary">Enregistrer</button>
+    </form>
+  </section>`;
+
+const ratesBlock = (plans) => `
+  <section class="card" style="margin-top:25px">
+    <h2>Tarifs de base</h2>
+    <p class="muted hint">Créez vos tarifs ici. Vous pourrez les appliquer à chaque projet, puis ajuster le montant pour ce projet seulement.</p>
+    ${plans.map(r => `
+      <form class="rate-row rate-edit" data-id="${r.id}">
+        <label>Nom<input name="name" value="${esc(r.name)}" required></label>
+        <label>Montant (€)<input name="amount" type="number" step="0.01" min="0" value="${r.amount}" required></label>
+        <label>Unité<select name="unit">${rateOpts(r.unit)}</select></label>
+        <label>Description<input name="description" value="${esc(r.description || '')}"></label>
+        <div class="rate-actions">
+          <button class="btn small primary">Enregistrer</button>
+          <button type="button" class="icon-btn" data-rdel="${r.id}" aria-label="Supprimer">✕</button>
+        </div>
+      </form>`).join('') || '<p class="empty">Aucun tarif pour le moment.</p>'}
+    <form id="rate-new" class="rate-row rate-new">
+      <label>Nom<input name="name" required placeholder="Ex. Tarif normal"></label>
+      <label>Montant (€)<input name="amount" type="number" step="0.01" min="0" required></label>
+      <label>Unité<select name="unit">${rateOpts('forfait')}</select></label>
+      <label>Description<input name="description" placeholder="Optionnel"></label>
+      <div class="rate-actions"><button class="btn small primary">Ajouter</button></div>
+    </form>
+  </section>`;
+
+const rateOpts = (sel) => Object.entries(RATE_UNITS)
+  .map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${l}</option>`).join('');
+
+async function renderAccount() {
+  const isAdmin = me.role === 'admin';
+  let settings = {};
+  let plans = [];
+  if (isAdmin) {
+    const [s, r] = await Promise.all([
+      sb.from('settings').select('data').eq('id', 1).single(),
+      sb.from('rate_plans').select('*').order('name')
+    ]);
+    if (s.error) throw s.error;
+    if (r.error) throw r.error;
+    settings = s.data.data || {};
+    plans = r.data;
+  }
+
   app.innerHTML = `
     <div class="page-head"><div>
       <h1>Mon compte</h1>
-      <p>${esc(me.email || '')}</p>
+      <p>${esc(me.email || '')} · ${isAdmin ? 'Administrateur' : 'Client'}</p>
     </div></div>
     <div class="grid two">
       <section class="card">
-        <h2>Coordonnées</h2>
+        <h2>Coordonnées et facturation</h2>
         <form id="acc-form" class="stack">
           <label>Nom complet<input name="full_name" value="${esc(me.full_name || '')}" required></label>
           <label>Téléphone<input type="tel" name="phone" value="${esc(me.phone || '')}"></label>
+          <label>Société (optionnel)<input name="company" value="${esc(me.company || '')}"></label>
+          <label>Adresse de facturation<textarea name="billing_address" rows="3">${esc(me.billing_address || '')}</textarea></label>
           <button class="btn primary">Enregistrer</button>
         </form>
       </section>
@@ -165,15 +234,19 @@ function renderAccount() {
           <button class="btn primary">Changer le mot de passe</button>
         </form>
       </section>
-    </div>`;
+    </div>
+    ${isAdmin ? settingsBlock(settings) + ratesBlock(plans) : ''}`;
 
   $('#acc-form').onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    const ok = await run(sb.from('profiles')
-      .update({ full_name: f.full_name.trim(), phone: f.phone.trim() || null })
-      .eq('id', me.id), 'Coordonnées enregistrées');
-    if (ok) { me.full_name = f.full_name.trim(); me.phone = f.phone.trim() || null; }
+    const upd = {
+      full_name: f.full_name.trim(),
+      phone: f.phone.trim() || null,
+      company: f.company.trim() || null,
+      billing_address: f.billing_address.trim() || null
+    };
+    if (await run(sb.from('profiles').update(upd).eq('id', me.id), 'Coordonnées enregistrées')) Object.assign(me, upd);
   };
 
   $('#pwd-form').onsubmit = async (e) => {
@@ -185,6 +258,38 @@ function renderAccount() {
     e.target.reset();
     toast('Mot de passe modifié');
   };
+
+  if (!isAdmin) return;
+
+  $('#settings-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const data = Object.fromEntries(SETTINGS_FIELDS.map(([k]) => [k, String(f.get(k) || '').trim()]));
+    await run(sb.from('settings').update({ data }).eq('id', 1), 'Émetteur enregistré');
+  };
+
+  const rateData = (f) => ({
+    name: String(f.get('name')).trim(),
+    amount: Number(f.get('amount') || 0),
+    unit: f.get('unit'),
+    description: String(f.get('description') || '').trim() || null
+  });
+
+  $('#rate-new').onsubmit = async (e) => {
+    e.preventDefault();
+    if (await run(sb.from('rate_plans').insert(rateData(new FormData(e.target))), 'Tarif ajouté'))
+      renderAccount().catch(ERR);
+  };
+  $$('.rate-edit').forEach(form => form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (await run(sb.from('rate_plans').update(rateData(new FormData(form))).eq('id', form.dataset.id), 'Tarif enregistré'))
+      renderAccount().catch(ERR);
+  });
+  $$('[data-rdel]').forEach(b => b.onclick = async () => {
+    if (!confirm('Supprimer ce tarif ? Les projets déjà tarifés ne sont pas modifiés.')) return;
+    if (await run(sb.from('rate_plans').delete().eq('id', b.dataset.rdel), 'Tarif supprimé'))
+      renderAccount().catch(ERR);
+  });
 }
 
 // ================= LISTES PROJETS =================
@@ -355,6 +460,7 @@ function infoBlock(p, client, isAdmin) {
       </form>
       <div class="info-list" style="margin-top:28px">
         ${info('Client', esc(client.full_name || '—'))}
+        ${info('Société', esc(client.company || '—'))}
         ${info('Email', client.email ? `<a href="mailto:${esc(client.email)}">${esc(client.email)}</a>` : '—')}
         ${info('Téléphone', client.phone ? `<a href="tel:${phoneHref(client.phone)}">${esc(client.phone)}</a>` : '—')}
       </div>
@@ -483,6 +589,33 @@ function tasksBlock(tasks, canEdit) {
   </section>`;
 }
 
+function tariffBlock(base, plans) {
+  const opts = plans.map(r =>
+    `<option value="${r.id}" data-amount="${r.amount}" data-unit="${r.unit}" data-name="${esc(r.name)}">
+      ${esc(r.name)} — ${fmtEur(r.amount)}${r.unit === 'heure' ? ' / h' : ' (forfait)'}</option>`).join('');
+
+  return `
+  <section class="card">
+    <h2>Tarif du projet</h2>
+    ${base
+      ? `<p class="rate-current">Actuel : <strong>${esc(base.label)}</strong> · ${fmtEur(base.amount)}</p>`
+      : '<p class="muted hint">Aucun tarif appliqué à ce projet.</p>'}
+    ${plans.length ? `
+    <form id="rate-form" class="stack">
+      <label>Tarif de base
+        <select name="plan"><option value="">— Choisir dans mes tarifs —</option>${opts}</select>
+      </label>
+      <div class="row-2">
+        <label>Quantité (heures ou forfaits)<input type="number" name="qty" step="0.5" min="0" value="1" required></label>
+        <label>Prix unitaire (€)<input type="number" name="unit_price" step="0.01" min="0" required></label>
+      </div>
+      <label>Libellé sur la facture<input name="label" required></label>
+      <p class="rate-total">Total de la prestation : <strong id="rate-total">—</strong></p>
+      <button class="btn primary">Appliquer à ce projet</button>
+    </form>` : '<p class="empty">Créez d\'abord vos tarifs dans Mon compte.</p>'}
+  </section>`;
+}
+
 function paymentsBlock(pays, isAdmin) {
   const total = pays.reduce((s, p) => s + Number(p.amount), 0);
   const paid = pays.filter(p => p.paid).reduce((s, p) => s + Number(p.amount), 0);
@@ -497,7 +630,10 @@ function paymentsBlock(pays, isAdmin) {
     <ul class="pay-list">
       ${pays.map(p => `
         <li>
-          <strong>${esc(p.label)}</strong>
+          <div>
+            <strong>${esc(p.label)}</strong>${p.is_base ? '<span class="tag-base">Tarif</span>' : ''}
+            ${p.is_base && p.quantity ? `<div class="muted small-text">${Number(p.quantity)} × ${fmtEur(p.unit_price ?? 0)}</div>` : ''}
+          </div>
           <div class="pay-right">
             <span class="status ${p.paid ? 'accepted' : 'pending'}">${p.paid ? 'Payé' : 'À régler'}</span>
             <strong>${fmtEur(p.amount)}</strong>
@@ -517,9 +653,28 @@ function paymentsBlock(pays, isAdmin) {
   </section>`;
 }
 
+function invoicesBlock(invs, isAdmin) {
+  return `
+  <section class="card">
+    <h2>Factures</h2>
+    <ul class="pay-list">
+      ${invs.map(i => `
+        <li>
+          <div><strong>${esc(i.number)}</strong><div class="muted small-text">${fmtDate(i.issue_date)}</div></div>
+          <div class="pay-right">
+            <strong>${fmtEur(i.total)}</strong>
+            <a class="btn small" href="#/factures/${i.id}">Voir / imprimer</a>
+            ${isAdmin ? `<button class="icon-btn small no-print" data-invdel="${i.id}" aria-label="Supprimer">✕</button>` : ''}
+          </div>
+        </li>`).join('') || '<li class="empty">Aucune facture émise.</li>'}
+    </ul>
+    ${isAdmin ? '<button id="new-invoice" class="btn primary no-print">Générer une facture</button>' : ''}
+  </section>`;
+}
+
 // ================= EXPORT AGENDA (.ics) =================
 function downloadIcs(p) {
-  if (!p.event_date) return ERR(new Error('Ce projet n\'a pas encore de date'));
+  if (!p.event_date) return ERR(new Error("Ce projet n'a pas encore de date"));
   const icsText = (s) => String(s || '')
     .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
   const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -545,21 +700,25 @@ function downloadIcs(p) {
 
 // ================= DÉTAIL PROJET =================
 async function renderProject(id, isAdmin) {
-  const [pr, up, tr, sc, tk, pa] = await Promise.all([
-    sb.from('projects').select('*, client:profiles!client_id(full_name, email, phone)').eq('id', id).single(),
+  const none = Promise.resolve({ data: [], error: null });
+  const [pr, up, tr, sc, tk, pa, iv, rp] = await Promise.all([
+    sb.from('projects').select('*, client:profiles!client_id(full_name, email, phone, company, billing_address)').eq('id', id).single(),
     sb.from('project_updates').select('*').eq('project_id', id).order('created_at', { ascending: false }),
     sb.from('project_tracks').select('*').eq('project_id', id).order('created_at'),
     sb.from('schedule_items').select('*').eq('project_id', id).order('start_time'),
     sb.from('project_tasks').select('*').eq('project_id', id).order('created_at'),
-    sb.from('project_payments').select('*').eq('project_id', id).order('created_at')
+    sb.from('project_payments').select('*').eq('project_id', id).order('created_at'),
+    sb.from('invoices').select('id, number, issue_date, total').eq('project_id', id).order('created_at', { ascending: false }),
+    isAdmin ? sb.from('rate_plans').select('*').order('name') : none
   ]);
-  for (const r of [pr, up, tr, sc, tk, pa]) if (r.error) throw r.error;
+  for (const r of [pr, up, tr, sc, tk, pa, iv, rp]) if (r.error) throw r.error;
 
   const p = pr.data;
   const client = p.client || {};
   const canEdit = isAdmin || p.status !== 'termine';
   const must = tr.data.filter(t => t.kind === 'must_play');
   const avoid = tr.data.filter(t => t.kind === 'do_not_play');
+  const base = pa.data.find(x => x.is_base);
   const reload = () => renderProject(id, isAdmin);
 
   app.innerHTML = `
@@ -588,7 +747,9 @@ async function renderProject(id, isAdmin) {
     <div class="extras">
       ${scheduleBlock(sc.data, canEdit)}
       ${tasksBlock(tk.data, canEdit)}
+      ${isAdmin ? tariffBlock(base, rp.data) : ''}
       ${paymentsBlock(pa.data, isAdmin)}
+      ${invoicesBlock(iv.data, isAdmin)}
     </div>
 
     <div class="grid two" style="margin-top:25px">
@@ -596,7 +757,6 @@ async function renderProject(id, isAdmin) {
       ${trackPanel('do_not_play', 'À ne pas passer', avoid, canEdit)}
     </div>`;
 
-  // Boutons d'en-tête
   $('#ics').onclick = () => downloadIcs(p);
   $('#print').onclick = () => window.print();
 
@@ -620,7 +780,7 @@ async function renderProject(id, isAdmin) {
     };
   }
 
-  // Suivi : publier et supprimer
+  // Suivi
   $('#update-form').onsubmit = async (e) => {
     e.preventDefault();
     const body = new FormData(e.target).get('body').trim();
@@ -673,6 +833,48 @@ async function renderProject(id, isAdmin) {
     if (await run(sb.from('project_tasks').delete().eq('id', b.dataset.tdel))) reload();
   });
 
+  // Tarif du projet (admin)
+  const rf = $('#rate-form');
+  if (rf) {
+    const sel = rf.plan, qty = rf.qty, unit = rf.unit_price, label = rf.label;
+    const tot = $('#rate-total');
+    const refresh = () => { tot.textContent = fmtEur((Number(qty.value) || 0) * (Number(unit.value) || 0)); };
+
+    if (base) {
+      qty.value = base.quantity ?? 1;
+      unit.value = base.unit_price ?? base.amount;
+      label.value = base.label;
+    }
+    sel.onchange = () => {
+      const o = sel.selectedOptions[0];
+      if (!o.value) return;
+      unit.value = o.dataset.amount;
+      label.value = o.dataset.name;
+      if (o.dataset.unit === 'heure' && !Number(qty.value)) qty.value = 1;
+      refresh();
+    };
+    qty.oninput = refresh;
+    unit.oninput = refresh;
+    refresh();
+
+    rf.onsubmit = async (e) => {
+      e.preventDefault();
+      const q = Number(qty.value);
+      const u = Number(unit.value);
+      const row = {
+        label: label.value.trim(),
+        quantity: q,
+        unit_price: u,
+        amount: Number((q * u).toFixed(2)),
+        is_base: true
+      };
+      const ok = base
+        ? await run(sb.from('project_payments').update(row).eq('id', base.id), 'Tarif mis à jour')
+        : await run(sb.from('project_payments').insert({ project_id: id, ...row }), 'Tarif appliqué');
+      if (ok) reload();
+    };
+  }
+
   // Paiements (admin)
   const pf = $('#pay-form');
   if (pf) pf.onsubmit = async (e) => {
@@ -689,6 +891,109 @@ async function renderProject(id, isAdmin) {
   $$('[data-pdel]').forEach(b => b.onclick = async () => {
     if (await run(sb.from('project_payments').delete().eq('id', b.dataset.pdel))) reload();
   });
+
+  // Factures (admin)
+  const ni = $('#new-invoice');
+  if (ni) ni.onclick = async () => {
+    if (!pa.data.length) return ERR(new Error('Ajoutez au moins une ligne de devis avant de générer la facture'));
+    if (!confirm('Générer la facture ? Elle sera figée avec les montants actuels.')) return;
+
+    const lines = pa.data.map(x => ({ label: x.label, amount: Number(x.amount), paid: x.paid }));
+    const total = lines.reduce((s, l) => s + l.amount, 0);
+    const paidSum = lines.filter(l => l.paid).reduce((s, l) => s + l.amount, 0);
+    const { data, error } = await sb.from('invoices').insert({
+      project_id: id,
+      lines,
+      total: Number(total.toFixed(2)),
+      paid: Number(paidSum.toFixed(2)),
+      client: {
+        name: client.full_name, company: client.company, address: client.billing_address,
+        email: client.email, phone: client.phone
+      }
+    }).select().single();
+    if (error) return ERR(error);
+    toast('Facture générée');
+    go('factures/' + data.id);
+  };
+  $$('[data-invdel]').forEach(b => b.onclick = async () => {
+    if (!confirm('Supprimer cette facture ?')) return;
+    if (await run(sb.from('invoices').delete().eq('id', b.dataset.invdel))) reload();
+  });
+}
+
+// ================= FACTURE (affichage et impression) =================
+async function renderInvoice(id) {
+  document.body.dataset.view = 'invoice';
+
+  const [iv, st] = await Promise.all([
+    sb.from('invoices').select('*, project:projects(title)').eq('id', id).single(),
+    sb.from('settings').select('data').eq('id', 1).single()
+  ]);
+  if (iv.error) throw iv.error;
+  if (st.error) throw st.error;
+
+  const inv = iv.data;
+  const s = st.data.data || {};
+  const c = inv.client || {};
+  const lines = inv.lines || [];
+  const rest = Number(inv.total) - Number(inv.paid);
+  const back = me.role === 'admin' ? `#/admin/projets/${inv.project_id}` : `#/projets/${inv.project_id}`;
+
+  app.innerHTML = `
+    <div class="page-head no-print">
+      <a href="${back}" class="back">← Retour au projet</a>
+      <div class="actions"><button class="btn primary" id="print-inv">Imprimer / PDF</button></div>
+    </div>
+
+    <article class="card invoice">
+      <header class="inv-head">
+        <div>
+          <div class="inv-brand">${esc(s.company_name || 'Votre entreprise')}</div>
+          ${s.owner_name ? `<p>${esc(s.owner_name)}</p>` : ''}
+          ${s.address ? `<p class="pre">${esc(s.address)}</p>` : ''}
+          ${s.siret ? `<p>SIRET : ${esc(s.siret)}</p>` : ''}
+          ${s.email || s.phone ? `<p>${esc([s.email, s.phone].filter(Boolean).join(' · '))}</p>` : ''}
+        </div>
+        <div class="inv-meta">
+          <h2>Facture</h2>
+          <p><strong>N° ${esc(inv.number)}</strong></p>
+          <p>Date : ${fmtDate(inv.issue_date)}</p>
+          <p>Projet : ${esc(inv.project?.title || '')}</p>
+        </div>
+      </header>
+
+      <div class="inv-parties">
+        <div>
+          <span>Facturé à</span>
+          <strong>${esc(c.company || c.name || '—')}</strong>
+          ${c.company && c.name ? `<p>${esc(c.name)}</p>` : ''}
+          ${c.address ? `<p class="pre">${esc(c.address)}</p>` : ''}
+          ${c.email ? `<p>${esc(c.email)}</p>` : ''}
+          ${c.phone ? `<p>${esc(c.phone)}</p>` : ''}
+        </div>
+      </div>
+
+      <table class="inv-table">
+        <thead><tr><th>Désignation</th><th class="r">Montant</th></tr></thead>
+        <tbody>
+          ${lines.map(l => `<tr><td>${esc(l.label)}</td><td class="r">${fmtEur(l.amount)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+
+      <div class="inv-totals">
+        <div><span>Total</span><strong>${fmtEur(inv.total)}</strong></div>
+        <div><span>Déjà réglé</span><strong>${fmtEur(inv.paid)}</strong></div>
+        <div class="grand"><span>Reste à payer</span><strong>${fmtEur(rest)}</strong></div>
+      </div>
+
+      <footer class="inv-foot">
+        ${s.tva_mention ? `<p>${esc(s.tva_mention)}</p>` : ''}
+        ${s.iban ? `<p>Règlement par virement : ${esc(s.iban)}</p>` : ''}
+        ${s.footer ? `<p>${esc(s.footer)}</p>` : ''}
+      </footer>
+    </article>`;
+
+  $('#print-inv').onclick = () => window.print();
 }
 
 // ================= ADMIN : CLIENTS =================
@@ -791,10 +1096,13 @@ async function renderClient(id) {
         <div class="info-list" style="margin-bottom:24px">
           ${info('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—')}
           ${info('Téléphone', c.phone ? `<a href="tel:${phoneHref(c.phone)}">${esc(c.phone)}</a>` : '—')}
+          ${info('Société', esc(c.company || '—'))}
         </div>
         <form id="client-form" class="stack">
           <label>Nom complet<input name="full_name" value="${esc(c.full_name || '')}" required></label>
           <label>Téléphone<input type="tel" name="phone" value="${esc(c.phone || '')}"></label>
+          <label>Société (optionnel)<input name="company" value="${esc(c.company || '')}"></label>
+          <label>Adresse de facturation<textarea name="billing_address" rows="3">${esc(c.billing_address || '')}</textarea></label>
           <button class="btn primary">Enregistrer</button>
         </form>
       </section>
@@ -809,9 +1117,12 @@ async function renderClient(id) {
   $('#client-form').onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    if (await run(sb.from('profiles')
-      .update({ full_name: f.full_name.trim(), phone: f.phone.trim() || null })
-      .eq('id', id), 'Coordonnées enregistrées')) renderClient(id);
+    if (await run(sb.from('profiles').update({
+      full_name: f.full_name.trim(),
+      phone: f.phone.trim() || null,
+      company: f.company.trim() || null,
+      billing_address: f.billing_address.trim() || null
+    }).eq('id', id), 'Coordonnées enregistrées')) renderClient(id);
   };
 }
 
