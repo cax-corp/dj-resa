@@ -50,12 +50,18 @@ function renderHeader() {
   const nav = $('#nav');
   $('#logout').classList.toggle('hidden', !me);
   if (!me) { nav.innerHTML = ''; return; }
+
+  const seg = location.hash.replace(/^#\/?/, '').split('/').slice(0, 2).join('/');
   const links = me.role === 'admin'
-    ? [['admin', 'Tous les projets']]
+    ? [['admin', 'Projets'], ['admin/clients', 'Clients']]
     : [['projets', 'Mes projets']];
+  const isActive = (p) => seg === p
+    || (p === 'admin' && (seg === 'admin/projets' || seg === 'admin/nouveau'));
+
   nav.innerHTML = links.map(([p, l]) =>
-    `<a href="#/${p}" class="${location.hash.startsWith('#/' + p) ? 'active' : ''}">${l}</a>`).join('');
+    `<a href="#/${p}" class="${isActive(p) ? 'active' : ''}">${l}</a>`).join('');
 }
+
 
 async function route() {
   try {
@@ -68,6 +74,9 @@ async function route() {
     if (me.role === 'admin') {
       if (a === 'admin' && b === 'nouveau') return await renderNewProject();
       if (a === 'admin' && b === 'projets' && c) return await renderProject(c, true);
+      if (a === 'admin' && b === 'clients' && c === 'nouveau') return renderNewClient();
+      if (a === 'admin' && b === 'clients' && c) return await renderClient(c);
+      if (a === 'admin' && b === 'clients') return await renderClientsList();
       if (a === 'admin') return await renderAdminList();
       return go('admin');
     }
@@ -79,6 +88,7 @@ async function route() {
     app.innerHTML = `<p class="empty">Erreur : ${esc(e.message)}</p>`;
   }
 }
+
 
 // ================= CONNEXION (pas d'inscription publique) =================
 function renderLogin() {
@@ -346,6 +356,144 @@ async function renderProject(id, isAdmin) {
     renderProject(id, isAdmin);
   });
 }
+
+// ================= ADMIN : CLIENTS =================
+async function renderClientsList() {
+  const [cl, pj] = await Promise.all([
+    sb.from('profiles').select('*').eq('role', 'client').order('full_name'),
+    sb.from('projects').select('id, client_id, status')
+  ]);
+  if (cl.error) throw cl.error;
+  if (pj.error) throw pj.error;
+
+  const total = (id) => pj.data.filter(p => p.client_id === id).length;
+  const enCours = (id) => pj.data.filter(p => p.client_id === id && p.status !== 'termine').length;
+
+  app.innerHTML = `
+    <div class="page-head">
+      <div><h1>Clients</h1><p>${cl.data.length} client(s)</p></div>
+      <a class="btn primary" href="#/admin/clients/nouveau">Nouveau client</a>
+    </div>
+    <div class="list">${cl.data.map(c => `
+      <a class="row-card" href="#/admin/clients/${c.id}">
+        <div>
+          <strong>${esc(c.full_name || 'Sans nom')}</strong>
+          <div class="muted">${esc(c.email || '')}${c.phone ? ' · ' + esc(c.phone) : ''}</div>
+        </div>
+        <span class="status">${enCours(c.id)} en cours · ${total(c.id)} au total</span>
+      </a>`).join('') || '<p class="empty">Aucun client pour le moment.</p>'}
+    </div>`;
+}
+
+function renderNewClient() {
+  app.innerHTML = `
+    <a href="#/admin/clients" class="back">← Clients</a>
+    <div class="page-head" style="margin-top:16px">
+      <div><h1>Nouveau client</h1><p>Le compte est créé immédiatement, sans email de confirmation.</p></div>
+    </div>
+    <section class="card narrow">
+      <form id="new-client" class="stack">
+        <label>Nom complet<input name="full_name" required></label>
+        <label>Téléphone<input type="tel" name="phone" autocomplete="off" required></label>
+        <label>Email (identifiant)<input type="email" name="email" required autocomplete="off"></label>
+        <label>Mot de passe provisoire (8 caractères min.)
+          <input type="text" name="password" minlength="8" required autocomplete="off"></label>
+        <button class="btn primary">Créer le compte</button>
+      </form>
+    </section>`;
+
+  $('#new-client').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+
+    const { data, error } = await sb.functions.invoke('create-client', { body: f });
+    btn.disabled = false;
+
+    if (error) {
+      const body = await error.context?.json?.().catch(() => null);
+      return ERR(new Error(body?.error || error.message));
+    }
+    toast('Client créé');
+    go('admin/clients/' + data.id);
+  };
+}
+
+async function renderClient(id) {
+  const [cl, pj] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', id).single(),
+    sb.from('projects').select('*').eq('client_id', id)
+      .order('event_date', { ascending: false, nullsFirst: false })
+  ]);
+  if (cl.error) throw cl.error;
+  if (pj.error) throw pj.error;
+
+  const c = cl.data;
+  const projects = pj.data;
+  const count = (k) => projects.filter(p => p.status === k).length;
+
+  app.innerHTML = `
+    <a href="#/admin/clients" class="back">← Clients</a>
+    <div class="page-head" style="margin-top:16px">
+      <div>
+        <h1>${esc(c.full_name || 'Sans nom')}</h1>
+        <p>Client depuis le ${new Date(c.created_at).toLocaleDateString('fr-FR')}</p>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="card stat"><span>Projets</span><strong>${projects.length}</strong></div>
+      <div class="card stat"><span>En préparation</span><strong>${count('preparation') + count('nouveau')}</strong></div>
+      <div class="card stat"><span>Validés</span><strong>${count('valide')}</strong></div>
+      <div class="card stat"><span>Terminés</span><strong>${count('termine')}</strong></div>
+    </div>
+
+    <div class="grid two" style="margin-top:25px">
+      <section class="card">
+        <h2>Coordonnées</h2>
+        <div class="info-list" style="margin-bottom:24px">
+          ${info('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—')}
+          ${info('Téléphone', c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : '—')}
+        </div>
+        <form id="client-form" class="stack">
+          <label>Nom complet<input name="full_name" value="${esc(c.full_name || '')}" required></label>
+          <label>Téléphone<input type="tel" name="phone" value="${esc(c.phone || '')}"></label>
+          <button class="btn primary">Enregistrer</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Historique des projets</h2>
+        <div class="list">${projects.map(p => projectRow(p, true)).join('')
+          || '<p class="empty">Aucun projet pour ce client.</p>'}</div>
+      </section>
+    </div>`;
+
+  $('#client-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const { error } = await sb.from('profiles')
+      .update({ full_name: f.full_name, phone: f.phone || null })
+      .eq('id', id);
+    if (error) return ERR(error);
+    toast('Coordonnées enregistrées');
+    renderClient(id);
+  };
+}
+
+// ================= CARTE (GOOGLE MAPS) =================
+const mapCard = (place) => place ? `
+  <section class="card map-card" style="margin-top:25px">
+    <div class="map-head">
+      <h2>Lieu</h2>
+      <a class="btn small" target="_blank" rel="noopener"
+         href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}">Ouvrir dans Maps</a>
+    </div>
+    <iframe class="map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+      title="Carte du lieu"
+      src="https://www.google.com/maps?q=${encodeURIComponent(place)}&output=embed"></iframe>
+  </section>` : '';
 
 // ================= MENU BURGER (MOBILE) =================
 const menuBtn = $('#menu-toggle');
