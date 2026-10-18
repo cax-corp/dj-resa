@@ -11,11 +11,13 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR',
   { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-const fmtEur = (n) => Number(n || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-const hm = (t) => String(t).slice(0, 5);
-const today = () => new Date().toLocaleDateString('en-CA'); // AAAA-MM-JJ local
-const STATUS = { pending: 'En attente', accepted: 'Confirmée', declined: 'Refusée', cancelled: 'Annulée', done: 'Terminée' };
+const fmtDateTime = (d) => new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+const STATUS = { nouveau: 'Nouveau', preparation: 'En préparation', valide: 'Validé', termine: 'Terminé' };
+const STATUS_CLS = { nouveau: 'pending', preparation: 'pending', valide: 'accepted', termine: 'done' };
+const STATUS_KEYS = Object.keys(STATUS);
 const go = (p) => (location.hash === '#/' + p ? route() : (location.hash = '#/' + p));
+const info = (label, value) => `
+  <div class="info-item"><span>${label}</span><strong>${value}</strong></div>`;
 
 function toast(msg, ok = true) {
   const t = $('#toast');
@@ -34,7 +36,7 @@ function setTheme(t) {
 }
 
 // ================= SESSION / ROUTEUR =================
-let me = null; // profil connecté
+let me = null;
 
 async function loadMe() {
   const { data: { session } } = await sb.auth.getSession();
@@ -48,188 +50,143 @@ function renderHeader() {
   const nav = $('#nav');
   $('#logout').classList.toggle('hidden', !me);
   if (!me) { nav.innerHTML = ''; return; }
-  const links = me.role === 'dj'
-    ? [['dj/dashboard', 'Tableau de bord'], ['dj/profile', 'Mon profil'], ['bookings', 'Réservations']]
-    : [['client/djs', 'Trouver un DJ'], ['bookings', 'Mes réservations']];
+  const links = me.role === 'admin'
+    ? [['admin', 'Tous les projets']]
+    : [['projets', 'Mes projets']];
   nav.innerHTML = links.map(([p, l]) =>
-    `<a href="#/${p}" class="${location.hash === '#/' + p ? 'active' : ''}">${l}</a>`).join('');
+    `<a href="#/${p}" class="${location.hash.startsWith('#/' + p) ? 'active' : ''}">${l}</a>`).join('');
 }
 
 async function route() {
   try {
     await loadMe();
     renderHeader();
-    if (!me) return renderAuth('login');
+    if (!me) return renderLogin();
 
     const [a, b, c] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-    const isDj = me.role === 'dj';
 
-    if (a === 'dj' && !isDj) return go('client/djs');
-    if (a === 'client' && isDj) return go('dj/dashboard');
-    if (a === 'dj' && b === 'dashboard') return await renderDjDashboard();
-    if (a === 'dj' && b === 'profile') return await renderDjProfile();
-    if (a === 'client' && b === 'djs') return await renderDjList();
-    if (a === 'client' && b === 'dj' && c) return await renderDjDetail(c);
-    if (a === 'bookings' && b) return await renderBookingDetail(b);
-    if (a === 'bookings') return await renderBookings();
-    return go(isDj ? 'dj/dashboard' : 'client/djs');
+    if (me.role === 'admin') {
+      if (a === 'admin' && b === 'nouveau') return await renderNewProject();
+      if (a === 'admin' && b === 'projets' && c) return await renderProject(c, true);
+      if (a === 'admin') return await renderAdminList();
+      return go('admin');
+    }
+
+    if (a === 'projets' && b) return await renderProject(b, false);
+    if (a === 'projets') return await renderClientList();
+    return go('projets');
   } catch (e) {
     app.innerHTML = `<p class="empty">Erreur : ${esc(e.message)}</p>`;
   }
 }
 
-// ================= AUTH =================
-function renderAuth(mode = 'login') {
-  const signup = mode === 'signup';
+// ================= CONNEXION (pas d'inscription publique) =================
+function renderLogin() {
   app.innerHTML = `
   <section class="auth card">
-    <h1>${signup ? 'Créer un compte' : 'Connexion'}</h1>
+    <h1>Connexion</h1>
     <form id="auth-form" class="stack">
-      ${signup ? `
-        <label>Nom complet<input name="full_name" required></label>
-        <label>Vous êtes
-          <select name="role">
-            <option value="client">Client</option>
-            <option value="dj">DJ / Prestataire</option>
-          </select>
-        </label>
-        <label>Nom de scène (DJ uniquement)<input name="stage_name"></label>` : ''}
       <label>Email<input type="email" name="email" required autocomplete="email"></label>
-      <label>Mot de passe<input type="password" name="password" minlength="8" required
-        autocomplete="${signup ? 'new-password' : 'current-password'}"></label>
-      <button class="btn primary block">${signup ? 'Créer mon compte' : 'Se connecter'}</button>
+      <label>Mot de passe<input type="password" name="password" required autocomplete="current-password"></label>
+      <button class="btn primary block">Se connecter</button>
     </form>
-    <button class="link" id="switch">${signup ? 'Déjà un compte ? Se connecter' : 'Pas de compte ? Créer un compte'}</button>
   </section>`;
 
-  $('#switch').onclick = () => renderAuth(signup ? 'login' : 'signup');
   $('#auth-form').onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    if (signup) {
-      const { error } = await sb.auth.signUp({
-        email: f.email, password: f.password,
-        options: { data: { full_name: f.full_name, role: f.role, stage_name: f.stage_name || null } }
-      });
-      if (error) return ERR(error);
-      toast('Compte créé ! Vérifiez vos emails si la confirmation est activée.');
-      return;
-    }
     const { error } = await sb.auth.signInWithPassword({ email: f.email, password: f.password });
     if (error) ERR(error);
   };
 }
 
-// ================= CLIENT : LISTE DES DJ =================
-const djCard = (d) => `
-  <a class="card dj-card" href="#/client/dj/${d.id}">
-    <h3>${esc(d.stage_name)}</h3>
-    <p class="muted">${esc(d.city || '—')}</p>
-    <div class="tags">${(d.genres || []).map(g => `<span class="tag">${esc(g)}</span>`).join('')}</div>
-    <div class="card-foot"><strong>${fmtEur(d.hourly_rate)}/h</strong><span class="btn small primary">Réserver</span></div>
+// ================= LISTES =================
+const projectRow = (p, isAdmin) => `
+  <a class="row-card" href="#/${isAdmin ? 'admin/projets' : 'projets'}/${p.id}">
+    <div>
+      <strong>${esc(p.title)}</strong>
+      <div class="muted">${p.event_date ? fmtDate(p.event_date) : 'Date à définir'}${p.location ? ' · ' + esc(p.location) : ''}</div>
+      ${isAdmin && p.client ? `<div class="muted">${esc(p.client.full_name || '')} ${p.client.email ? '· ' + esc(p.client.email) : ''}</div>` : ''}
+    </div>
+    <span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>
   </a>`;
 
-async function renderDjList() {
-  const { data: djs, error } = await sb.from('dj_profiles').select('*')
-    .eq('is_public', true).order('stage_name');
+async function renderAdminList() {
+  const { data, error } = await sb.from('projects')
+    .select('*, client:profiles!client_id(full_name, email)')
+    .order('event_date', { ascending: true, nullsFirst: false });
+  if (error) throw error;
+
+  app.innerHTML = `
+    <div class="page-head">
+      <div><h1>Tous les projets</h1><p>${data.length} projet(s)</p></div>
+      <a class="btn primary" href="#/admin/nouveau">Nouveau projet</a>
+    </div>
+    <div class="list">${data.map(p => projectRow(p, true)).join('') || '<p class="empty">Aucun projet pour le moment.</p>'}</div>`;
+}
+
+async function renderClientList() {
+  const { data, error } = await sb.from('projects').select('*')
+    .order('event_date', { ascending: true, nullsFirst: false });
   if (error) throw error;
 
   app.innerHTML = `
     <div class="page-head"><div>
-      <h1>Trouver un DJ</h1>
-      <p class="muted">Comparez les profils et envoyez une demande</p>
+      <h1>Mes projets</h1>
+      <p>Suivez l'avancement de vos événements</p>
     </div></div>
-    <input id="q" class="search" placeholder="Rechercher un nom, une ville, un style…">
-    <div class="grid three" id="grid"></div>`;
-
-  const draw = (q) => {
-    const s = q.toLowerCase();
-    const list = djs.filter(d =>
-      `${d.stage_name} ${d.city || ''} ${(d.genres || []).join(' ')}`.toLowerCase().includes(s));
-    $('#grid').innerHTML = list.map(djCard).join('') || '<p class="empty">Aucun DJ trouvé.</p>';
-  };
-  $('#q').oninput = (e) => draw(e.target.value);
-  draw('');
+    <div class="list">${data.map(p => projectRow(p, false)).join('') || '<p class="empty">Aucun projet pour le moment.</p>'}</div>`;
 }
 
-// ================= CLIENT : FICHE DJ + DEMANDE =================
-async function renderDjDetail(id) {
-  const { data: d, error } = await sb.from('dj_profiles').select('*').eq('id', id).single();
-  if (error) throw error;
-
+// ================= ADMIN : NOUVEAU PROJET =================
+async function renderNewProject() {
   app.innerHTML = `
-    <a href="#/client/djs" class="back">← Retour aux DJ</a>
-    <div class="grid two" style="margin-top:16px">
-      <section class="card">
-        <h1>${esc(d.stage_name)}</h1>
-        <p class="muted">${esc(d.city || '')} · ${fmtEur(d.hourly_rate)} / heure</p>
-        <div class="tags" style="margin:12px 0">${(d.genres || []).map(g => `<span class="tag">${esc(g)}</span>`).join('')}</div>
-        <p class="bio">${esc(d.bio || 'Pas encore de présentation.')}</p>
-      </section>
-      <section class="card">
-        <h2 style="margin-top:0">Demander une réservation</h2>
-        <form id="book" class="stack">
-          <label>Nom de l'événement<input name="event_name" required></label>
-          <div class="row-2">
-            <label>Date<input type="date" name="event_date" min="${today()}" required></label>
-            <label>Lieu<input name="location"></label>
-          </div>
-          <div class="row-2">
-            <label>Début<input type="time" name="start_time" required></label>
-            <label>Fin<input type="time" name="end_time" required></label>
-          </div>
-          <label>Nombre d'invités<input type="number" name="guests" min="1"></label>
-          <label>Notes<textarea name="notes" rows="3"></textarea></label>
-          <button class="btn primary">Envoyer la demande</button>
-        </form>
-      </section>
-    </div>`;
+    <a href="#/admin" class="back">← Tous les projets</a>
+    <div class="page-head" style="margin-top:16px">
+      <div><h1>Nouveau projet</h1><p>Le client doit déjà avoir un compte.</p></div>
+    </div>
+    <section class="card narrow">
+      <form id="new-project" class="stack">
+        <label>Email du client<input type="email" name="client_email" required></label>
+        <label>Nom du projet / événement<input name="title" required></label>
+        <div class="row-2">
+          <label>Date<input type="date" name="event_date"></label>
+          <label>Lieu<input name="location"></label>
+        </div>
+        <label>Description<textarea name="description" rows="4"></textarea></label>
+        <button class="btn primary">Créer le projet</button>
+      </form>
+    </section>`;
 
-  $('#book').onsubmit = async (e) => {
+  $('#new-project').onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    const { data, error } = await sb.from('bookings').insert({
-      client_id: me.id, dj_id: id,
-      event_name: f.event_name, event_date: f.event_date,
-      start_time: f.start_time, end_time: f.end_time,
+
+    const { data: client, error: e1 } = await sb.from('profiles')
+      .select('id').ilike('email', f.client_email.trim()).maybeSingle();
+    if (e1) return ERR(e1);
+    if (!client) return ERR(new Error('Aucun compte client avec cet email'));
+
+    const { data, error } = await sb.from('projects').insert({
+      client_id: client.id,
+      title: f.title,
+      event_date: f.event_date || null,
       location: f.location || null,
-      guests: f.guests ? Number(f.guests) : null,
-      notes: f.notes || null
+      description: f.description || null
     }).select().single();
     if (error) return ERR(error);
-    toast('Demande envoyée au DJ');
-    go('bookings/' + data.id);
+
+    toast('Projet créé');
+    go('admin/projets/' + data.id);
   };
 }
 
-// ================= LISTES DE RÉSERVATIONS =================
-function bookingRow(b) {
-  return `
-  <a class="row-card" href="#/bookings/${b.id}">
-    <div>
-      <strong>${esc(b.event_name)}</strong>
-      <div class="muted">${fmtDate(b.event_date)} · ${hm(b.start_time)}–${hm(b.end_time)}${b.location ? ' · ' + esc(b.location) : ''}</div>
-    </div>
-    <span class="status ${b.status}">${STATUS[b.status]}</span>
-  </a>`;
-}
-
-async function renderBookings() {
-  const col = me.role === 'dj' ? 'dj_id' : 'client_id';
-  const { data, error } = await sb.from('bookings').select('*')
-    .eq(col, me.id).order('event_date', { ascending: false });
-  if (error) throw error;
-  app.innerHTML = `
-    <div class="page-head"><h1>Réservations</h1></div>
-    <div class="list">${data.map(bookingRow).join('') || '<p class="empty">Aucune réservation pour le moment.</p>'}</div>`;
-}
-
-// ================= DÉTAIL RÉSERVATION + TITRES =================
+// ================= DÉTAIL PROJET (admin et client) =================
 function trackPanel(kind, title, items, canEdit) {
   const must = kind === 'must_play';
   return `
   <section class="card track-panel ${kind}">
-    <h2 style="margin-top:0">${title}</h2>
+    <h2>${title}</h2>
     <ul class="tracks">
       ${items.map(t => `
         <li>
@@ -250,125 +207,144 @@ function trackPanel(kind, title, items, canEdit) {
   </section>`;
 }
 
-async function renderBookingDetail(id) {
-  const [{ data: b, error }, { data: tracks, error: e2 }] = await Promise.all([
-    sb.from('bookings').select('*').eq('id', id).single(),
-    sb.from('track_requests').select('*').eq('booking_id', id).order('created_at')
+async function renderProject(id, isAdmin) {
+  const [pr, up, tr] = await Promise.all([
+    sb.from('projects').select('*, client:profiles!client_id(full_name, email, phone)').eq('id', id).single(),
+    sb.from('project_updates').select('*').eq('project_id', id).order('created_at', { ascending: false }),
+    sb.from('project_tracks').select('*').eq('project_id', id).order('created_at')
   ]);
-  if (error || e2) throw (error || e2);
+  for (const r of [pr, up, tr]) if (r.error) throw r.error;
 
-  const isDj = me.role === 'dj' && b.dj_id === me.id;
-  const isClient = b.client_id === me.id;
-  const canEdit = isClient && ['pending', 'accepted'].includes(b.status);
-
-  const actions = [];
-  if (isDj && b.status === 'pending') actions.push(['accepted', 'Accepter', 'primary'], ['declined', 'Refuser', 'danger']);
-  if (isDj && b.status === 'accepted') actions.push(['done', 'Marquer terminée', '']);
-  if (isClient && b.status === 'pending') actions.push(['cancelled', 'Annuler la demande', 'danger']);
-
+  const p = pr.data;
+  const updates = up.data;
+  const tracks = tr.data;
+  const client = p.client || {};
+  const canEdit = isAdmin || p.status !== 'termine';
   const must = tracks.filter(t => t.kind === 'must_play');
   const avoid = tracks.filter(t => t.kind === 'do_not_play');
+  const statusOptions = STATUS_KEYS.map(k =>
+    `<option value="${k}" ${k === p.status ? 'selected' : ''}>${STATUS[k]}</option>`).join('');
+
+  const infoBlock = isAdmin ? `
+    <section class="card">
+      <h2>Modifier le projet</h2>
+      <form id="edit-form" class="stack">
+        <label>Nom<input name="title" value="${esc(p.title)}" required></label>
+        <div class="row-2">
+          <label>Date<input type="date" name="event_date" value="${p.event_date || ''}"></label>
+          <label>Lieu<input name="location" value="${esc(p.location || '')}"></label>
+        </div>
+        <label>Statut<select name="status">${statusOptions}</select></label>
+        <label>Description<textarea name="description" rows="4">${esc(p.description || '')}</textarea></label>
+        <div class="actions" style="margin-top:4px">
+          <button class="btn primary">Enregistrer</button>
+          <button type="button" id="delete-project" class="btn danger">Supprimer le projet</button>
+        </div>
+      </form>
+      <div class="info-list" style="margin-top:28px">
+        ${info('Client', esc(client.full_name || '—'))}
+        ${info('Email', client.email ? `<a href="mailto:${esc(client.email)}">${esc(client.email)}</a>` : '—')}
+        ${info('Téléphone', client.phone ? `<a href="tel:${esc(client.phone.replace(/\s+/g, ''))}">${esc(client.phone)}</a>` : '—')}
+      </div>
+    </section>` : `
+    <section class="card">
+      <h2>Mon projet</h2>
+      <div class="info-list">
+        ${info('Date', p.event_date ? fmtDate(p.event_date) : 'À définir')}
+        ${info('Lieu', esc(p.location || '—'))}
+        ${info('Statut', `<span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>`)}
+      </div>
+      ${p.description ? `<div class="notes"><span>Description</span><p>${esc(p.description)}</p></div>` : ''}
+    </section>`;
+
+  const updatesBlock = `
+    <section class="card">
+      <h2>Suivi</h2>
+      <form id="update-form" class="stack update-form">
+        <textarea name="body" rows="3" placeholder="Ajouter une information ou une mise à jour…" required></textarea>
+        <button class="btn primary" style="align-self:flex-end">Publier</button>
+      </form>
+      <div class="updates">
+        ${updates.map(u => `
+          <div class="update-item">
+            <div class="update-meta">${u.author_id === me.id ? 'Vous' : (isAdmin ? 'Client' : 'Votre DJ')} · ${fmtDateTime(u.created_at)}</div>
+            <p>${esc(u.body)}</p>
+          </div>`).join('') || '<p class="empty">Aucune mise à jour pour le moment.</p>'}
+      </div>
+    </section>`;
 
   app.innerHTML = `
-    <a href="#/bookings" class="back">← Réservations</a>
-    <div class="page-head" style="margin-top:12px">
+    <a href="${isAdmin ? '#/admin' : '#/projets'}" class="back">← ${isAdmin ? 'Tous les projets' : 'Mes projets'}</a>
+    <div class="page-head" style="margin-top:16px">
       <div>
-        <h1>${esc(b.event_name)}</h1>
-        <p class="muted">${fmtDate(b.event_date)} · ${hm(b.start_time)} – ${hm(b.end_time)}${b.location ? ' · ' + esc(b.location) : ''}${b.guests ? ' · ' + b.guests + ' invités' : ''}</p>
-        ${b.notes ? `<p class="muted">${esc(b.notes)}</p>` : ''}
+        <h1>${esc(p.title)}</h1>
+        <p>${p.event_date ? fmtDate(p.event_date) : 'Date à définir'}${p.location ? ' · ' + esc(p.location) : ''}</p>
       </div>
-      <span class="status ${b.status}">${STATUS[b.status]}</span>
+      <span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>
     </div>
-    ${actions.length ? `<div class="actions">${actions.map(([s, l, c]) =>
-      `<button class="btn ${c}" data-st="${s}">${l}</button>`).join('')}</div>` : ''}
-    <div class="grid two" style="margin-top:16px">
+
+    <div class="grid two">${infoBlock}${updatesBlock}</div>
+
+    <div class="grid two" style="margin-top:25px">
       ${trackPanel('must_play', 'À passer absolument', must, canEdit)}
       ${trackPanel('do_not_play', 'À ne pas passer', avoid, canEdit)}
     </div>`;
 
-  $$('[data-st]').forEach(btn => btn.onclick = async () => {
-    const { error } = await sb.from('bookings').update({ status: btn.dataset.st }).eq('id', id);
-    if (error) return ERR(error);
-    toast('Statut mis à jour');
-    renderBookingDetail(id);
-  });
+  // Modifier le projet (admin)
+  const editForm = $('#edit-form');
+  if (editForm) {
+    editForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      const { error } = await sb.from('projects').update({
+        title: f.title,
+        event_date: f.event_date || null,
+        location: f.location || null,
+        description: f.description || null,
+        status: f.status
+      }).eq('id', id);
+      if (error) return ERR(error);
+      toast('Projet enregistré');
+      renderProject(id, isAdmin);
+    };
 
+    $('#delete-project').onclick = async () => {
+      if (!confirm('Supprimer ce projet et tout son contenu ? Cette action est définitive.')) return;
+      const { error } = await sb.from('projects').delete().eq('id', id);
+      if (error) return ERR(error);
+      toast('Projet supprimé');
+      go('admin');
+    };
+  }
+
+  // Publier une mise à jour
+  $('#update-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = new FormData(e.target).get('body').trim();
+    if (!body) return;
+    const { error } = await sb.from('project_updates').insert({ project_id: id, author_id: me.id, body });
+    if (error) return ERR(error);
+    renderProject(id, isAdmin);
+  };
+
+  // Ajouter un titre
   $$('.track-form').forEach(form => form.onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(form));
-    const { error } = await sb.from('track_requests').insert({
-      booking_id: id, kind: form.dataset.kind,
+    const { error } = await sb.from('project_tracks').insert({
+      project_id: id, kind: form.dataset.kind,
       title: f.title, artist: f.artist, note: f.note || null
     });
     if (error) return ERR(error);
-    renderBookingDetail(id);
+    renderProject(id, isAdmin);
   });
 
+  // Supprimer un titre
   $$('[data-del]').forEach(btn => btn.onclick = async () => {
-    const { error } = await sb.from('track_requests').delete().eq('id', btn.dataset.del);
+    const { error } = await sb.from('project_tracks').delete().eq('id', btn.dataset.del);
     if (error) return ERR(error);
-    renderBookingDetail(id);
+    renderProject(id, isAdmin);
   });
-}
-
-// ================= DJ : TABLEAU DE BORD =================
-async function renderDjDashboard() {
-  const { data, error } = await sb.from('bookings').select('*')
-    .eq('dj_id', me.id).order('event_date');
-  if (error) throw error;
-
-  const pending = data.filter(b => b.status === 'pending');
-  const upcoming = data.filter(b => b.status === 'accepted' && b.event_date >= today());
-
-  app.innerHTML = `
-    <div class="page-head"><div>
-      <h1>Bonjour ${esc(me.full_name || '')}</h1>
-      <p class="muted">Vos demandes et prochains événements</p>
-    </div></div>
-    <div class="stats">
-      <div class="card stat"><span>En attente</span><strong>${pending.length}</strong></div>
-      <div class="card stat"><span>À venir</span><strong>${upcoming.length}</strong></div>
-      <div class="card stat"><span>Total</span><strong>${data.length}</strong></div>
-    </div>
-    <h2>Demandes en attente</h2>
-    <div class="list">${pending.map(bookingRow).join('') || '<p class="empty">Aucune demande en attente.</p>'}</div>
-    <h2>Prochains événements</h2>
-    <div class="list">${upcoming.map(bookingRow).join('') || '<p class="empty">Rien de prévu.</p>'}</div>`;
-}
-
-// ================= DJ : PROFIL =================
-async function renderDjProfile() {
-  const { data: d, error } = await sb.from('dj_profiles').select('*').eq('id', me.id).single();
-  if (error) throw error;
-
-  app.innerHTML = `
-    <div class="page-head"><h1>Mon profil DJ</h1></div>
-    <form id="dj-form" class="card stack narrow">
-      <label>Nom de scène<input name="stage_name" value="${esc(d.stage_name)}" required></label>
-      <div class="row-2">
-        <label>Ville<input name="city" value="${esc(d.city || '')}"></label>
-        <label>Tarif horaire (€)<input type="number" name="hourly_rate" min="0" step="1" value="${d.hourly_rate}"></label>
-      </div>
-      <label>Styles (séparés par des virgules)<input name="genres" value="${esc((d.genres || []).join(', '))}"></label>
-      <label>Présentation<textarea name="bio" rows="5">${esc(d.bio || '')}</textarea></label>
-      <label class="check"><input type="checkbox" name="is_public" ${d.is_public ? 'checked' : ''}> Profil visible par les clients</label>
-      <button class="btn primary">Enregistrer</button>
-    </form>`;
-
-  $('#dj-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target);
-    const { error } = await sb.from('dj_profiles').update({
-      stage_name: f.get('stage_name'),
-      city: f.get('city') || null,
-      bio: f.get('bio') || null,
-      hourly_rate: Number(f.get('hourly_rate') || 0),
-      genres: String(f.get('genres')).split(',').map(s => s.trim()).filter(Boolean),
-      is_public: f.get('is_public') === 'on'
-    }).eq('id', me.id);
-    if (error) return ERR(error);
-    toast('Profil enregistré');
-  };
 }
 
 // ================= MENU BURGER (MOBILE) =================
@@ -383,7 +359,6 @@ function setMenu(open) {
 }
 
 menuBtn.onclick = () => setMenu(!navEl.classList.contains('open'));
-// Ferme le menu après un clic sur un lien
 navEl.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
 window.addEventListener('hashchange', () => setMenu(false));
 window.addEventListener('resize', () => { if (window.innerWidth > 768) setMenu(false); });
