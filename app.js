@@ -224,6 +224,8 @@ async function renderProject(id, isAdmin) {
     sb.from('project_tracks').select('*').eq('project_id', id).order('created_at')
   ]);
   for (const r of [pr, up, tr]) if (r.error) throw r.error;
+  await renderExtras(id, isAdmin);
+
 
   const p = pr.data;
   const updates = up.data;
@@ -495,6 +497,200 @@ const mapCard = (place) => place ? `
       title="Carte du lieu"
       src="https://www.google.com/maps?q=${encodeURIComponent(place)}&output=embed"></iframe>
   </section>` : '';
+
+// ================= PLANNING, CHECKLIST, PAIEMENTS =================
+const SCHEDULE_KIND = {
+  arrivee: 'Arrivée', installation: 'Installation', set: 'Set', pause: 'Pause',
+  repas: 'Repas', ceremonie: 'Cérémonie', autre: 'Autre'
+};
+const hmTime = (t) => (t ? String(t).slice(0, 5) : '');
+
+function scheduleBlock(items, canEdit) {
+  const kindOpts = Object.entries(SCHEDULE_KIND)
+    .map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
+
+  return `
+  <section class="card extras-full">
+    <div class="map-head">
+      <h2>Planning de la soirée</h2>
+      <button type="button" class="btn small no-print" data-print>Imprimer</button>
+    </div>
+    <ol class="timeline">
+      ${items.map(s => `
+        <li class="tl-item">
+          <div class="tl-time">${hmTime(s.start_time)}${s.end_time ? `<small>${hmTime(s.end_time)}</small>` : ''}</div>
+          <div class="tl-body">
+            <span class="tl-kind">${SCHEDULE_KIND[s.kind] || 'Autre'}</span>
+            <strong>${esc(s.title)}</strong>
+            ${s.details ? `<p>${esc(s.details)}</p>` : ''}
+          </div>
+          ${canEdit ? `<button class="icon-btn small no-print" data-sdel="${s.id}" aria-label="Supprimer">✕</button>` : ''}
+        </li>`).join('') || '<li class="empty">Aucun créneau planifié.</li>'}
+    </ol>
+    ${canEdit ? `
+    <form id="schedule-form" class="track-form stack no-print">
+      <div class="row-2">
+        <label>Début<input type="time" name="start_time" required></label>
+        <label>Fin<input type="time" name="end_time"></label>
+      </div>
+      <div class="row-2">
+        <label>Type<select name="kind">${kindOpts}</select></label>
+        <label>Titre<input name="title" required placeholder="Ex. Arrivée du DJ"></label>
+      </div>
+      <label>Détails (optionnel)<input name="details" placeholder="Ex. Accès par le parking Nord"></label>
+      <button class="btn primary">Ajouter au planning</button>
+    </form>` : ''}
+  </section>`;
+}
+
+function tasksBlock(tasks, canEdit) {
+  const done = tasks.filter(t => t.done).length;
+  const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+
+  return `
+  <section class="card">
+    <h2>Checklist</h2>
+    <div class="progress"><div style="width:${pct}%"></div></div>
+    <p class="muted progress-label">${done} / ${tasks.length} terminée(s)</p>
+    <ul class="check-list">
+      ${tasks.map(t => `
+        <li class="${t.done ? 'is-done' : ''}">
+          <label class="check">
+            <input type="checkbox" data-ttog="${t.id}" ${t.done ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+            <span>${esc(t.label)}</span>
+          </label>
+          ${canEdit ? `<button class="icon-btn small no-print" data-tdel="${t.id}" aria-label="Supprimer">✕</button>` : ''}
+        </li>`).join('') || '<li class="empty">Aucune tâche.</li>'}
+    </ul>
+    ${canEdit ? `
+    <form id="task-form" class="task-add no-print">
+      <input name="label" placeholder="Nouvelle tâche (ex. Envoyer le plan de scène)" required>
+      <button class="btn small">Ajouter</button>
+    </form>` : ''}
+  </section>`;
+}
+
+function paymentsBlock(pays, isAdmin) {
+  const total = pays.reduce((s, p) => s + Number(p.amount), 0);
+  const paid = pays.filter(p => p.paid).reduce((s, p) => s + Number(p.amount), 0);
+
+  return `
+  <section class="card">
+    <h2>Devis et paiements</h2>
+    <div class="stats-mini">
+      <div><span>Total</span><strong>${fmtEur(total)}</strong></div>
+      <div><span>Réglé</span><strong>${fmtEur(paid)}</strong></div>
+      <div><span>Reste</span><strong>${fmtEur(total - paid)}</strong></div>
+    </div>
+    <ul class="pay-list">
+      ${pays.map(p => `
+        <li>
+          <strong>${esc(p.label)}</strong>
+          <div class="pay-right">
+            <span class="status ${p.paid ? 'accepted' : 'pending'}">${p.paid ? 'Payé' : 'À régler'}</span>
+            <strong>${fmtEur(p.amount)}</strong>
+            ${isAdmin ? `
+              <button class="btn small no-print" data-ppaid="${p.id}" data-val="${p.paid ? '0' : '1'}">
+                ${p.paid ? 'Annuler' : 'Marquer payé'}</button>
+              <button class="icon-btn small no-print" data-pdel="${p.id}" aria-label="Supprimer">✕</button>` : ''}
+          </div>
+        </li>`).join('') || '<li class="empty">Aucune ligne de devis.</li>'}
+    </ul>
+    ${isAdmin ? `
+    <form id="pay-form" class="task-add no-print">
+      <input name="label" placeholder="Libellé (ex. Acompte 30 %)" required>
+      <input class="amount" name="amount" type="number" step="0.01" min="0" placeholder="€" required>
+      <button class="btn small primary">Ajouter</button>
+    </form>` : ''}
+  </section>`;
+}
+
+async function renderExtras(id, isAdmin) {
+  const [sc, tk, pa, pr] = await Promise.all([
+    sb.from('schedule_items').select('*').eq('project_id', id).order('start_time'),
+    sb.from('project_tasks').select('*').eq('project_id', id).order('created_at'),
+    sb.from('project_payments').select('*').eq('project_id', id).order('created_at'),
+    sb.from('projects').select('status').eq('id', id).single()
+  ]);
+  for (const r of [sc, tk, pa, pr]) if (r.error) throw r.error;
+
+  const canEdit = isAdmin || pr.data.status !== 'termine';
+
+  app.insertAdjacentHTML('beforeend', `
+    <div id="extras" class="extras">
+      ${scheduleBlock(sc.data, canEdit)}
+      ${tasksBlock(tk.data, canEdit)}
+      ${paymentsBlock(pa.data, isAdmin)}
+    </div>`);
+
+  const root = $('#extras');
+  const reload = () => renderProject(id, isAdmin);
+
+  // Imprimer
+  root.querySelector('[data-print]')?.addEventListener('click', () => window.print());
+
+  // Planning
+  const sf = $('#schedule-form', root);
+  if (sf) sf.onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const { error } = await sb.from('schedule_items').insert({
+      project_id: id, start_time: f.start_time, end_time: f.end_time || null,
+      kind: f.kind, title: f.title, details: f.details || null
+    });
+    if (error) return ERR(error);
+    reload();
+  };
+  root.querySelectorAll('[data-sdel]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('schedule_items').delete().eq('id', b.dataset.sdel);
+    if (error) return ERR(error);
+    reload();
+  });
+
+  // Checklist
+  const tf = $('#task-form', root);
+  if (tf) tf.onsubmit = async (e) => {
+    e.preventDefault();
+    const label = new FormData(e.target).get('label').trim();
+    if (!label) return;
+    const { error } = await sb.from('project_tasks').insert({ project_id: id, label });
+    if (error) return ERR(error);
+    reload();
+  };
+  root.querySelectorAll('[data-ttog]').forEach(cb => cb.onchange = async () => {
+    const { error } = await sb.from('project_tasks').update({ done: cb.checked }).eq('id', cb.dataset.ttog);
+    if (error) return ERR(error);
+    reload();
+  });
+  root.querySelectorAll('[data-tdel]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('project_tasks').delete().eq('id', b.dataset.tdel);
+    if (error) return ERR(error);
+    reload();
+  });
+
+  // Paiements (admin)
+  const pf = $('#pay-form', root);
+  if (pf) pf.onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const { error } = await sb.from('project_payments').insert({
+      project_id: id, label: f.label, amount: Number(f.amount)
+    });
+    if (error) return ERR(error);
+    reload();
+  };
+  root.querySelectorAll('[data-ppaid]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('project_payments')
+      .update({ paid: b.dataset.val === '1' }).eq('id', b.dataset.ppaid);
+    if (error) return ERR(error);
+    reload();
+  });
+  root.querySelectorAll('[data-pdel]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('project_payments').delete().eq('id', b.dataset.pdel);
+    if (error) return ERR(error);
+    reload();
+  });
+}
 
 // ================= MENU BURGER (MOBILE) =================
 const menuBtn = $('#menu-toggle');
