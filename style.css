@@ -568,3 +568,116 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
 @media (max-width: 768px) {
     .map-frame { height: 280px; }
 }
+
+/* ===== 17. PLANNING, CHECKLIST, PAIEMENTS ===== */
+.extras {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 25px;
+    margin-top: 25px;
+}
+.extras-full { grid-column: 1 / -1; }
+
+/* Planning */
+.timeline { list-style: none; margin: 0 0 24px; padding: 0; }
+.tl-item {
+    display: grid; grid-template-columns: 90px 1fr auto; gap: 18px; align-items: start;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+.tl-item:last-child { border-bottom: none; }
+.tl-time {
+    font-size: 16px; font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+.tl-time small {
+    display: block; font-size: 12px; font-weight: 400; color: var(--text-lighter);
+}
+.tl-kind {
+    display: inline-block; margin-bottom: 6px; padding: 2px 7px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-light); background: var(--bg-alt);
+    border: 1px solid var(--border); border-radius: var(--radius);
+}
+.tl-body strong { display: block; font-size: 15px; font-weight: 600; color: var(--text); }
+.tl-body p {
+    margin-top: 4px; font-size: 13px; color: var(--text-light);
+    white-space: pre-line; overflow-wrap: anywhere;
+}
+
+/* Checklist */
+.progress {
+    height: 6px; background: var(--bg-alt);
+    border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.progress div { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+.progress-label { font-size: 12px; margin: 8px 0 16px; }
+.check-list {
+    list-style: none; padding: 0; margin: 0 0 20px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.check-list li {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-alt);
+}
+.check-list li.is-done span { text-decoration: line-through; color: var(--text-lighter); }
+.check-list li.empty {
+    justify-content: center; background: transparent; border-style: dashed;
+    color: var(--text-lighter); font-size: 13px;
+}
+.check-list .check {
+    flex: 1; flex-direction: row; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 500; text-transform: none; letter-spacing: normal;
+    color: var(--text); cursor: pointer;
+}
+
+.task-add { display: flex; gap: 10px; margin-top: 8px; }
+.task-add input { flex: 1; }
+.task-add input.amount { flex: 0 0 140px; width: 140px; }
+
+/* Paiements */
+.stats-mini {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;
+}
+.stats-mini div {
+    padding: 14px; background: var(--bg-alt);
+    border: 1px solid var(--border); border-radius: var(--radius);
+}
+.stats-mini span {
+    display: block; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-light);
+}
+.stats-mini strong { display: block; margin-top: 6px; font-size: 18px; color: var(--accent); }
+
+.pay-list {
+    list-style: none; padding: 0; margin: 0 0 20px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.pay-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+}
+.pay-list li.empty { justify-content: center; border-style: dashed; color: var(--text-lighter); }
+.pay-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pay-right > strong { color: var(--accent); }
+
+@media (max-width: 480px) {
+    .tl-item { grid-template-columns: 64px 1fr; }
+    .tl-item .icon-btn { grid-column: 2; justify-self: end; }
+    .stats-mini { grid-template-columns: 1fr; }
+    .task-add { flex-direction: column; }
+    .task-add input.amount { flex: none; width: 100%; }
+}
+
+/* Impression du planning (Ctrl+P ou bouton Imprimer) */
+@media print {
+    .topbar, .no-print, .toast, .back, .map-card, .auth { display: none !important; }
+    body { background: #fff; color: #000; }
+    .container { padding: 0; max-width: none; }
+    .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+    .extras { display: block; }
+    .extras > * + * { margin-top: 20px; }
+}
