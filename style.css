@@ -469,6 +469,32 @@ select {
     color: var(--text-lighter); justify-content: center;
 }
 .track-form { padding-top: 22px; border-top: 1px solid var(--border); }
+.track-link {
+    flex-shrink: 0; color: var(--accent); font-size: 12px; font-weight: 600;
+    white-space: nowrap; border-bottom: 1px solid var(--border-strong);
+}
+.track-link:hover { border-bottom-color: var(--accent); }
+
+.share-box {
+    margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
+}
+.share-box strong { display: block; margin-bottom: 5px; }
+.share-box p { margin-bottom: 12px; }
+.share-actions { display: flex; gap: 8px; }
+.share-actions input { min-width: 0; flex: 1; }
+
+.public-page { max-width: 1050px; margin: 0 auto; }
+.public-brand {
+    margin-bottom: 42px; color: var(--accent); font-size: 22px; font-weight: 300;
+    letter-spacing: -0.5px;
+}
+.public-brand span { font-weight: 700; }
+.public-summary { margin-bottom: 25px; }
+.public-note { margin-top: 25px; color: var(--text-lighter); font-size: 12px; text-align: center; }
+.eyebrow {
+    margin-bottom: 8px; color: var(--text-lighter); font-size: 11px;
+    font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
+}
 
 /* ===== 15. NOTIFICATIONS ===== */
 .toast {

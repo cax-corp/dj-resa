@@ -21,7 +21,16 @@ const addDays = (iso, n) => {
   return d.toLocaleDateString('en-CA');
 };
 const phoneHref = (p) => String(p || '').replace(/[^\d+]/g, '');
+const safeUrl = (value) => {
+  try {
+    const url = new URL(String(value || ''));
+    return /^https?:$/.test(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+};
 const go = (p) => (location.hash === '#/' + p ? route() : (location.hash = '#/' + p));
+const publicProjectUrl = (id) => `${location.origin}${location.pathname}#/partage/${encodeURIComponent(id)}`;
 const info = (label, value) => `
   <div class="info-item"><span>${label}</span><strong>${value}</strong></div>`;
 const ERR = (e) => toast(e?.message || 'Une erreur est survenue', false);
@@ -104,6 +113,11 @@ function renderHeader() {
 async function route() {
   document.body.dataset.view = '';
   try {
+    const parsed = parseHash();
+    if (parsed.a === 'partage' && parsed.b) {
+      renderHeader();
+      return renderPublicProject(parsed.b);
+    }
     await loadMe();
     renderHeader();
     if (!me) return renderLogin();
@@ -465,6 +479,14 @@ function infoBlock(p, client, isAdmin) {
         ${info('Téléphone', client.phone ? `<a href="tel:${phoneHref(client.phone)}">${esc(client.phone)}</a>` : '—')}
       </div>
       <div class="actions"><a class="btn small" href="#/admin/clients/${p.client_id}">Fiche client</a></div>
+      <div class="share-box no-print">
+        <strong>Partager une vue publique</strong>
+        <p class="muted">Le lien ne montre ni les tarifs, ni la préparation, ni les coordonnées du client.</p>
+        <div class="share-actions">
+          <input id="public-link" readonly value="${esc(publicProjectUrl(p.id))}" aria-label="Lien public du projet">
+          <button type="button" class="btn small" id="copy-public-link">Copier le lien</button>
+        </div>
+      </div>
     </section>`;
 }
 
@@ -499,6 +521,7 @@ function trackPanel(kind, title, items, canEdit) {
         <li>
           <div><strong>${esc(t.title)}</strong> <span class="muted">— ${esc(t.artist)}</span>
           ${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}</div>
+          ${safeUrl(t.url) ? `<a class="track-link" href="${esc(safeUrl(t.url))}" target="_blank" rel="noopener noreferrer">Ouvrir le lien ↗</a>` : ''}
           ${canEdit ? `<button class="icon-btn small" data-trkdel="${t.id}" aria-label="Supprimer">✕</button>` : ''}
         </li>`).join('') || '<li class="empty">Aucun titre.</li>'}
     </ul>
@@ -508,10 +531,62 @@ function trackPanel(kind, title, items, canEdit) {
         <input name="title" placeholder="Titre" required>
         <input name="artist" placeholder="Artiste" required>
       </div>
+      <input name="url" type="url" placeholder="Lien (Spotify, YouTube…)" inputmode="url">
       <input name="note" placeholder="Note (optionnel)">
       <button class="btn ${must ? 'primary' : 'danger'}">${must ? 'Ajouter à passer absolument' : 'Ajouter à ne pas passer'}</button>
     </form>` : ''}
   </section>`;
+}
+
+async function renderPublicProject(id) {
+  const [pr, tr] = await Promise.all([
+    sb.from('projects').select('id, title, event_date, location, description, status').eq('id', id).single(),
+    sb.from('project_tracks').select('id, kind, title, artist, note, url').eq('project_id', id).order('created_at')
+  ]);
+  if (pr.error) throw pr.error;
+  if (tr.error) throw tr.error;
+
+  const p = pr.data;
+  const must = tr.data.filter(t => t.kind === 'must_play');
+  const avoid = tr.data.filter(t => t.kind === 'do_not_play');
+  const publicTrackList = (items, empty) => `
+    <ul class="tracks">
+      ${items.map(t => `
+        <li>
+          <div>
+            <strong>${esc(t.title)}</strong> <span class="muted">— ${esc(t.artist)}</span>
+            ${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}
+          </div>
+          ${safeUrl(t.url) ? `<a class="track-link" href="${esc(safeUrl(t.url))}" target="_blank" rel="noopener noreferrer">Ouvrir le lien ↗</a>` : ''}
+        </li>`).join('') || `<li class="empty">${empty}</li>`}
+    </ul>`;
+
+  app.innerHTML = `
+    <div class="public-page">
+      <div class="public-brand">DJ<span>Booking</span></div>
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">Vue publique du projet</p>
+          <h1>${esc(p.title)}</h1>
+          <p>${p.event_date ? fmtDate(p.event_date) : 'Date à définir'}${p.location ? ' · ' + esc(p.location) : ''}</p>
+        </div>
+        <span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>
+      </div>
+      <section class="card public-summary">
+        <h2>Informations essentielles</h2>
+        <div class="info-list">
+          ${info('Date', p.event_date ? fmtDate(p.event_date) : 'À définir')}
+          ${info('Lieu', esc(p.location || 'À définir'))}
+          ${info('Statut', `<span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>`)}
+        </div>
+        ${p.description ? `<div class="notes"><span>Description</span><p>${esc(p.description)}</p></div>` : ''}
+      </section>
+      <div class="grid two">
+        <section class="card track-panel must_play"><h2>À passer absolument</h2>${publicTrackList(must, 'Aucun titre ajouté.')}</section>
+        <section class="card track-panel do_not_play"><h2>À ne pas passer</h2>${publicTrackList(avoid, 'Aucun titre ajouté.')}</section>
+      </div>
+      <p class="public-note">Cette page est une vue partagée limitée du projet.</p>
+    </div>`;
 }
 
 function mapCard(place) {
@@ -759,6 +834,16 @@ async function renderProject(id, isAdmin) {
 
   $('#ics').onclick = () => downloadIcs(p);
   $('#print').onclick = () => window.print();
+  const copyPublicLink = $('#copy-public-link');
+  if (copyPublicLink) copyPublicLink.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(publicProjectUrl(p.id));
+      toast('Lien public copié');
+    } catch {
+      $('#public-link').select();
+      toast('Copiez le lien sélectionné', false);
+    }
+  };
 
   // Modification du projet (admin)
   const editForm = $('#edit-form');
@@ -797,7 +882,8 @@ async function renderProject(id, isAdmin) {
     const f = Object.fromEntries(new FormData(form));
     if (await run(sb.from('project_tracks').insert({
       project_id: id, kind: form.dataset.kind,
-      title: f.title.trim(), artist: f.artist.trim(), note: f.note?.trim() || null
+      title: f.title.trim(), artist: f.artist.trim(), url: f.url?.trim() || null,
+      note: f.note?.trim() || null
     }))) reload();
   });
   $$('[data-trkdel]').forEach(b => b.onclick = async () => {
