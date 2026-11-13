@@ -157,3 +157,11 @@ Validation : `node tests/guest-sheet.cjs` pour la saisie directe, le clavier, le
 Le script `db/document-reader.sql` et la fonction `supabase/functions/read-document/index.ts` vérifient l'utilisateur avec ses droits RLS ou un jeton actif propre au document avant de transmettre le fichier. Aucun chemin Storage ni lien signé n'est exposé. Déployer la fonction `read-document` avec `verify_jwt=false` : elle assure elle-même ces vérifications.
 
 Validation : `node tests/document-edge.cjs`, `tests/document-reader.sql` (transaction annulée), `node tests/document-viewer.cjs` (ouverture native, téléchargement et liens révoqués).
+
+## Lisibilité et animations
+
+La présentation conserve les thèmes sobres clair et sombre avec des textes plus grands, des contrastes renforcés, des cartes de synthèse distinctes, des champs plus confortables et des actions principales mieux visibles. Les onglets des outils restent accessibles pendant le défilement ; sur mobile, ils défilent horizontalement et montrent automatiquement la rubrique active. Le menu mobile se ferme par le fond, Échap ou un lien, et le clavier reste dans la navigation tant qu'elle est ouverte.
+
+`interface.js` anime brièvement l'apparition des grands blocs, sans observer la saisie dans les tableaux ni modifier les formulaires. Les boutons et raccourcis ont des retours visuels, et une barre indique le chargement d'une page. La préférence système de réduction des mouvements désactive les animations, y compris lorsqu'elle change pendant l'utilisation. Les impressions restent sans navigation ni animations.
+
+`node tests/interface.cjs` vérifie les thèmes et tailles de 360 à 1 440 pixels, le menu au clavier, la navigation fixe, les mouvements réduits, le chargement et le contraste du texte. Les suites existantes couvrent toujours projets, invités, documents, formulaires et impressions. Aucun changement de données ni migration.

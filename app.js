@@ -137,7 +137,11 @@ function renderHeader() {
   $('#profile-role').textContent = me.role === 'admin' ? 'Administrateur' : 'Espace client';
 }
 
+let routeVersion = 0;
 async function route() {
+  const version = ++routeVersion;
+  document.body.classList.add('is-loading');
+  app.setAttribute('aria-busy', 'true');
   document.body.dataset.view = '';
   try {
     const parsed = parseHash();
@@ -156,6 +160,11 @@ async function route() {
     await dispatch(parseHash());
   } catch (e) {
     app.innerHTML = `<p class="empty">Erreur : ${esc(e.message)}</p>`;
+  } finally {
+    if (version === routeVersion) {
+      document.body.classList.remove('is-loading');
+      app.setAttribute('aria-busy', 'false');
+    }
   }
 }
 
@@ -1370,6 +1379,9 @@ const navEl = $('#nav');
 
 function setMenu(open) {
   navEl.classList.toggle('open', open);
+  $('#menu-scrim').hidden = !open;
+  document.body.classList.toggle('menu-open', open);
+  app.inert = open;
   $('.sidebar').classList.toggle('open', open);
   menuBtn.setAttribute('aria-expanded', String(open));
   menuBtn.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
@@ -1377,10 +1389,25 @@ function setMenu(open) {
 }
 
 $('.skip-link').onclick = event => { event.preventDefault(); app.focus(); };
-menuBtn.onclick = () => setMenu(!navEl.classList.contains('open'));
+menuBtn.onclick = () => {
+  const open = !navEl.classList.contains('open');
+  setMenu(open);
+  if (open) navEl.querySelector('a.active, a')?.focus();
+};
+$('#menu-scrim').onclick = () => { setMenu(false); menuBtn.focus(); };
 navEl.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
 window.addEventListener('hashchange', () => setMenu(false));
-window.addEventListener('keydown', event => { if (event.key === 'Escape') setMenu(false); });
+window.addEventListener('keydown', event => {
+  if (!navEl.classList.contains('open')) return;
+  if (event.key === 'Escape') { setMenu(false); menuBtn.focus(); }
+  if (event.key === 'Tab') {
+    const links = [...navEl.querySelectorAll('a[href]')];
+    const targets = [menuBtn, ...links];
+    const next = targets.indexOf(document.activeElement) + (event.shiftKey ? -1 : 1);
+    event.preventDefault();
+    targets[(next + targets.length) % targets.length]?.focus();
+  }
+});
 window.addEventListener('resize', () => { if (window.innerWidth > 768) setMenu(false); });
 
 // ================= BOOT =================
