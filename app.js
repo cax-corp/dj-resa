@@ -30,7 +30,14 @@ const safeUrl = (value) => {
   }
 };
 const go = (p) => (location.hash === '#/' + p ? route() : (location.hash = '#/' + p));
-const publicProjectUrl = (id) => `${location.origin}${location.pathname}#/partage/${encodeURIComponent(id)}`;
+const publicProjectUrl = (token) => `${location.origin}${location.pathname}#/partage/${encodeURIComponent(token)}`;
+const SHARE_SECTIONS = {
+  event_date: 'Date', location: 'Lieu', status: 'Statut', description: 'Description',
+  must_play: 'À passer absolument', do_not_play: 'À ne pas passer',
+  schedule: 'Planning', tasks: 'Checklist', updates: 'Suivi',
+  payments: 'Tarifs et paiements', client: 'Coordonnées du client', invoices: 'Résumé des factures'
+};
+const DEFAULT_SHARE_SECTIONS = ['event_date', 'location', 'status', 'description', 'must_play', 'do_not_play'];
 const info = (label, value) => `
   <div class="info-item"><span>${label}</span><strong>${value}</strong></div>`;
 const ERR = (e) => toast(e?.message || 'Une erreur est survenue', false);
@@ -116,7 +123,7 @@ async function route() {
     const parsed = parseHash();
     if (parsed.a === 'partage' && parsed.b) {
       renderHeader();
-      return renderPublicProject(parsed.b);
+      return await renderPublicProject(parsed.b);
     }
     await loadMe();
     renderHeader();
@@ -480,12 +487,18 @@ function infoBlock(p, client, isAdmin) {
       </div>
       <div class="actions"><a class="btn small" href="#/admin/clients/${p.client_id}">Fiche client</a></div>
       <div class="share-box no-print">
-        <strong>Partager une vue publique</strong>
-        <p class="muted">Le lien ne montre ni les tarifs, ni la préparation, ni les coordonnées du client.</p>
-        <div class="share-actions">
-          <input id="public-link" readonly value="${esc(publicProjectUrl(p.id))}" aria-label="Lien public du projet">
-          <button type="button" class="btn small" id="copy-public-link">Copier le lien</button>
-        </div>
+        <strong>Partager le projet en lecture seule</strong>
+        <p class="muted">Toute personne disposant du lien pourra consulter les rubriques choisies sans connexion. Le nom du projet est toujours visible. Les rubriques restent à jour.</p>
+        <form id="share-form" class="stack">
+          <fieldset class="share-options">
+            <legend>Rubriques visibles avec ce nouveau lien</legend>
+            ${Object.entries(SHARE_SECTIONS).map(([key, label]) => `
+              <label class="check"><input type="checkbox" name="sections" value="${key}" ${DEFAULT_SHARE_SECTIONS.includes(key) ? 'checked' : ''}><span>${label}</span></label>`).join('')}
+          </fieldset>
+          <button class="btn primary">Créer le lien</button>
+        </form>
+        <p class="muted hint">Chaque lien conserve ses propres choix. Pour changer les accès, révoquez le lien et créez-en un nouveau.</p>
+        <div id="share-links" class="stack" aria-live="polite"></div>
       </div>
     </section>`;
 }
@@ -538,55 +551,97 @@ function trackPanel(kind, title, items, canEdit) {
   </section>`;
 }
 
-async function renderPublicProject(id) {
-  const [pr, tr] = await Promise.all([
-    sb.from('projects').select('id, title, event_date, location, description, status').eq('id', id).single(),
-    sb.from('project_tracks').select('id, kind, title, artist, note, url').eq('project_id', id).order('created_at')
-  ]);
-  if (pr.error) throw pr.error;
-  if (tr.error) throw tr.error;
-
-  const p = pr.data;
-  const must = tr.data.filter(t => t.kind === 'must_play');
-  const avoid = tr.data.filter(t => t.kind === 'do_not_play');
-  const publicTrackList = (items, empty) => `
-    <ul class="tracks">
-      ${items.map(t => `
-        <li>
-          <div>
-            <strong>${esc(t.title)}</strong> <span class="muted">— ${esc(t.artist)}</span>
-            ${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}
-          </div>
-          ${safeUrl(t.url) ? `<a class="track-link" href="${esc(safeUrl(t.url))}" target="_blank" rel="noopener noreferrer">Ouvrir le lien ↗</a>` : ''}
-        </li>`).join('') || `<li class="empty">${empty}</li>`}
-    </ul>`;
-
+async function renderPublicProject(token) {
+  document.body.dataset.view = 'public';
+  app.innerHTML = '<p class="empty">Chargement du projet partagé…</p>';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
+    return renderUnavailableShare();
+  }
+  const { data: p, error } = await sb.rpc('get_shared_project', { share_token: token });
+  if (error) throw error;
+  if (!p) return renderUnavailableShare();
+  const has = key => Object.hasOwn(p, key);
+  const client = p.client || {};
+  const details = [
+    has('event_date') ? info('Date', p.event_date ? fmtDate(p.event_date) : 'À définir') : '',
+    has('location') ? info('Lieu', esc(p.location || 'À définir')) : '',
+    has('status') ? info('Statut', esc(STATUS[p.status] || p.status)) : ''
+  ].join('');
   app.innerHTML = `
     <div class="public-page">
-      <div class="public-brand">DJ<span>Booking</span></div>
-      <div class="page-head">
-        <div>
-          <p class="eyebrow">Vue publique du projet</p>
-          <h1>${esc(p.title)}</h1>
-          <p>${p.event_date ? fmtDate(p.event_date) : 'Date à définir'}${p.location ? ' · ' + esc(p.location) : ''}</p>
-        </div>
-        <span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>
+      <div class="page-head"><div><p class="eyebrow">Projet partagé · Lecture seule</p><h1>${esc(p.title)}</h1></div>
+        <a class="btn small no-print" href="#/connexion">Se connecter pour modifier</a>
       </div>
-      <section class="card public-summary">
-        <h2>Informations essentielles</h2>
-        <div class="info-list">
-          ${info('Date', p.event_date ? fmtDate(p.event_date) : 'À définir')}
-          ${info('Lieu', esc(p.location || 'À définir'))}
-          ${info('Statut', `<span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>`)}
-        </div>
-        ${p.description ? `<div class="notes"><span>Description</span><p>${esc(p.description)}</p></div>` : ''}
-      </section>
+      ${details || has('description') ? `<section class="card public-summary"><h2>Informations du projet</h2>
+        <div class="info-list">${details}</div>
+        ${p.description ? `<div class="notes"><span>Description</span><p>${esc(p.description)}</p></div>` : ''}</section>` : ''}
       <div class="grid two">
-        <section class="card track-panel must_play"><h2>À passer absolument</h2>${publicTrackList(must, 'Aucun titre ajouté.')}</section>
-        <section class="card track-panel do_not_play"><h2>À ne pas passer</h2>${publicTrackList(avoid, 'Aucun titre ajouté.')}</section>
+        ${has('must_play') ? trackPanel('must_play', 'À passer absolument', p.must_play, false) : ''}
+        ${has('do_not_play') ? trackPanel('do_not_play', 'À ne pas passer', p.do_not_play, false) : ''}
+        ${has('schedule') ? scheduleBlock(p.schedule, false) : ''}
+        ${has('tasks') ? tasksBlock(p.tasks, false) : ''}
+        ${has('payments') ? paymentsBlock(p.payments, false) : ''}
+        ${has('updates') ? `<section class="card"><h2>Suivi</h2><div class="updates">${p.updates.map(u => `
+          <div class="update-item"><div class="update-meta">${fmtDateTime(u.created_at)}</div><p>${esc(u.body)}</p></div>`).join('') || '<p class="empty">Aucune mise à jour.</p>'}</div></section>` : ''}
+        ${has('client') ? `<section class="card"><h2>Coordonnées du client</h2><div class="info-list">${[
+          ['Nom', client.full_name], ['Société', client.company], ['Email', client.email],
+          ['Téléphone', client.phone], ['Adresse de facturation', client.billing_address]
+        ].map(([label, value]) => info(label, esc(value || '—'))).join('')}</div></section>` : ''}
+        ${has('invoices') ? `<section class="card"><h2>Résumé des factures</h2><ul class="pay-list">${p.invoices.map(i => `
+          <li><div><strong>${esc(i.number)}</strong><div>${fmtDate(i.issue_date)}</div></div><strong>${fmtEur(i.total)}</strong></li>`).join('') || '<li class="empty">Aucune facture émise.</li>'}</ul></section>` : ''}
       </div>
-      <p class="public-note">Cette page est une vue partagée limitée du projet.</p>
+      <p class="public-note">Seules les rubriques choisies par la personne qui partage ce lien sont visibles. La modification nécessite une connexion et les droits sur le projet.</p>
     </div>`;
+}
+
+function renderUnavailableShare() {
+  app.innerHTML = '<section class="card"><h1>Lien indisponible</h1><p>Ce lien est invalide ou a été révoqué. Demandez un nouveau lien à la personne qui vous l’a envoyé.</p></section>';
+}
+
+async function bindProjectSharing(projectId) {
+  const form = $('#share-form');
+  if (!form) return;
+  const list = $('#share-links');
+  const refresh = async () => {
+    const { data, error } = await sb.from('project_shares').select('token, sections, created_at')
+      .eq('project_id', projectId).order('created_at', { ascending: false });
+    if (error) { list.textContent = 'Impossible de charger les liens de partage.'; ERR(error); return; }
+    list.innerHTML = data.map(link => `
+      <div class="share-link">
+        <p class="muted">${fmtDateTime(link.created_at)} · ${link.sections.map(k => esc(SHARE_SECTIONS[k])).join(', ') || 'Nom du projet uniquement'}</p>
+        <div class="share-actions">
+          <input readonly value="${esc(publicProjectUrl(link.token))}" aria-label="Lien de partage" data-link="${link.token}">
+          <button type="button" class="btn small" data-copy-share="${link.token}">Copier</button>
+          <a class="btn small" href="${esc(publicProjectUrl(link.token))}" target="_blank" rel="noopener noreferrer">Aperçu</a>
+          <button type="button" class="btn small danger" data-revoke-share="${link.token}">Révoquer</button>
+        </div>
+      </div>`).join('') || '<p class="muted">Aucun lien actif.</p>';
+    $$('[data-copy-share]', list).forEach(button => button.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(publicProjectUrl(button.dataset.copyShare));
+        toast('Lien copié');
+      } catch {
+        $(`[data-link="${button.dataset.copyShare}"]`, list).select();
+        toast('Copiez le lien sélectionné', false);
+      }
+    });
+    $$('[data-revoke-share]', list).forEach(button => button.onclick = async () => {
+      if (!confirm('Révoquer ce lien ? Il ne permettra plus de consulter le projet.')) return;
+      button.disabled = true;
+      if (await run(sb.from('project_shares').delete().eq('token', button.dataset.revokeShare).eq('project_id', projectId), 'Lien révoqué')) await refresh();
+      else button.disabled = false;
+    });
+  };
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const button = $('button', form);
+    button.disabled = true;
+    try {
+      const sections = new FormData(form).getAll('sections');
+      if (await run(sb.from('project_shares').insert({ project_id: projectId, sections }), 'Lien créé')) await refresh();
+    } finally { button.disabled = false; }
+  };
+  await refresh();
 }
 
 function mapCard(place) {
@@ -775,6 +830,7 @@ function downloadIcs(p) {
 
 // ================= DÉTAIL PROJET =================
 async function renderProject(id, isAdmin) {
+  if (!me) return renderLogin();
   const none = Promise.resolve({ data: [], error: null });
   const [pr, up, tr, sc, tk, pa, iv, rp] = await Promise.all([
     sb.from('projects').select('*, client:profiles!client_id(full_name, email, phone, company, billing_address)').eq('id', id).single(),
@@ -834,16 +890,7 @@ async function renderProject(id, isAdmin) {
 
   $('#ics').onclick = () => downloadIcs(p);
   $('#print').onclick = () => window.print();
-  const copyPublicLink = $('#copy-public-link');
-  if (copyPublicLink) copyPublicLink.onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(publicProjectUrl(p.id));
-      toast('Lien public copié');
-    } catch {
-      $('#public-link').select();
-      toast('Copiez le lien sélectionné', false);
-    }
-  };
+  bindProjectSharing(id).catch(ERR);
 
   // Modification du projet (admin)
   const editForm = $('#edit-form');
@@ -1234,6 +1281,7 @@ $('#theme-toggle').onclick = () =>
 $('#logout').onclick = () => sb.auth.signOut();
 window.addEventListener('hashchange', route);
 sb.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') me = null;
   if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') route();
 });
 

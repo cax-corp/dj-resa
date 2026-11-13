@@ -692,3 +692,15 @@ select {
     }
     .inv-table tr { break-inside: avoid; }
 }
+
+.share-options {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 8px;
+    min-width: 0;
+}
+.share-options legend { padding: 0 6px; font-size: 13px; }
+.share-options .check { display: flex; align-items: center; gap: 8px; }
+.share-options input { width: auto; }
+.share-link { padding-top: 14px; border-top: 1px solid var(--border); }
+.share-actions { flex-wrap: wrap; }
+.share-actions input { flex: 1 1 220px; }

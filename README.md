@@ -1,1 +1,46 @@
-# dj-resa
+# DJ Booking
+
+Application statique HTML/CSS/JavaScript avec Supabase.
+
+## Partage des projets
+
+Depuis la fiche projet administrateur, cocher les rubriques à rendre visibles, puis
+cliquer sur **Créer le lien**. Chaque lien possède un jeton aléatoire et conserve
+sa sélection. Le titre est toujours visible. Les données des rubriques choisies
+restent à jour ; ce n'est pas une copie figée du projet.
+
+Les visiteurs peuvent consulter le lien sans compte. La vue partagée ne propose
+aucune modification. Les utilisateurs connectés conservent leurs droits existants
+sur les projets. Seuls les administrateurs peuvent créer, lister ou révoquer les
+liens. La révocation bloque les prochaines lectures ; les données déjà consultées
+ne peuvent pas être retirées du navigateur d'un destinataire.
+
+Les coordonnées du client, les paiements, le suivi, le planning, la checklist et
+les résumés des factures sont masqués par défaut. Les factures partagées présentent
+uniquement leur numéro, leur date et leur total.
+
+## Base de données et publication
+
+Le schéma `db/project-sharing.sql` correspond à la migration Supabase
+`token_scoped_project_sharing`, appliquée au projet configuré dans `app.js`.
+Pour une autre base, appliquer ce script une seule fois avant de publier les
+fichiers statiques. Les lectures anonymes directes de `projects` et
+`project_tracks` sont supprimées : seule la fonction `get_shared_project` renvoie
+les champs autorisés pour un jeton actif.
+
+**Les anciens liens fondés sur l'identifiant du projet ne fonctionnent plus.**
+Créer de nouveaux liens depuis la nouvelle interface, puis les transmettre aux
+destinataires. GitHub Pages publie automatiquement les fichiers à la racine
+depuis la branche `main` du dépôt `cax-corp/dj-resa`.
+
+## Vérification
+
+- Syntaxe : `node --check app.js`
+- Navigateur : lancer `python -m http.server 8000`, puis
+  `node tests/project-sharing.cjs` avec Playwright disponible dans Node et Chromium
+  installé (`CHROMIUM_PATH` permet de changer son chemin, `TEST_URL` l'adresse).
+  Ce test utilise un service simulé pour les interactions et les vues publiques.
+- Base réelle : exécuter `tests/project-sharing.sql` dans l'éditeur SQL Supabase.
+  Ce test exige un administrateur et un client existants. Il crée des données de
+  test dans une transaction annulée à la fin et vérifie le filtrage des rubriques,
+  les droits anonymes/connectés, les liens inconnus et leur révocation.
