@@ -704,3 +704,8 @@ select {
 .share-link { padding-top: 14px; border-top: 1px solid var(--border); }
 .share-actions { flex-wrap: wrap; }
 .share-actions input { flex: 1 1 220px; }
+
+.status.ongoing { color: var(--accent); background: var(--bg-alt); border-color: var(--accent); }
+.project-badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.archive-notice { margin-bottom: 18px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); }
+.archive-actions { margin-bottom: 22px; }

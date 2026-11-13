@@ -44,3 +44,28 @@ depuis la branche `main` du dépôt `cax-corp/dj-resa`.
   Ce test exige un administrateur et un client existants. Il crée des données de
   test dans une transaction annulée à la fin et vérifie le filtrage des rubriques,
   les droits anonymes/connectés, les liens inconnus et leur révocation.
+
+## Archivage et état « En cours »
+
+Dans la fiche projet administrateur, **Archiver le projet** range le projet dans
+la vue **Archivés**. **Restaurer le projet** le remet dans la vue **Non archivés**.
+Le filtre **Tous les projets** affiche les deux. Ces vues sont aussi disponibles
+pour les clients ; seul un administrateur peut archiver ou restaurer.
+
+L'archivage ajoute uniquement une date `archived_at`. Il ne change ni le statut,
+ni le contenu, ni les droits existants, ni les jetons ou rubriques des liens de
+partage. Les liens restent consultables après archivage.
+
+L'état **En cours** (`en_cours`) se choisit manuellement dans le formulaire de
+modification du projet, lorsque l'événement se déroule. Aucun projet n'est changé
+automatiquement de statut. Cet état apparaît dans les listes, les fiches et les
+liens qui autorisent l'affichage du statut.
+
+La migration `add_project_archiving_and_in_progress_status` correspond au script
+`db/project-archiving.sql`. Pour une nouvelle base, l'appliquer après le script de
+partage. Elle vérifie que les données des projets et des liens existants ainsi que
+leurs réponses publiques sont identiques avant et après la modification.
+
+`tests/project-archiving.sql` vérifie l'archivage, la restauration, les droits et la
+continuité des liens dans une transaction annulée. Le test navigateur couvre aussi
+le nouvel état et les filtres des vues administrateur et client.

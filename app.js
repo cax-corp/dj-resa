@@ -57,8 +57,8 @@ function toast(msg, ok = true) {
   t._timer = setTimeout(() => t.classList.add('hidden'), 3500);
 }
 
-const STATUS = { nouveau: 'Nouveau', preparation: 'En préparation', valide: 'Validé', termine: 'Terminé' };
-const STATUS_CLS = { nouveau: 'pending', preparation: 'pending', valide: 'accepted', termine: 'done' };
+const STATUS = { nouveau: 'Nouveau', preparation: 'En préparation', valide: 'Validé', en_cours: 'En cours', termine: 'Terminé' };
+const STATUS_CLS = { nouveau: 'pending', preparation: 'pending', valide: 'accepted', en_cours: 'ongoing', termine: 'done' };
 const STATUS_KEYS = Object.keys(STATUS);
 const SCHEDULE_KIND = {
   arrivee: 'Arrivée', installation: 'Installation', set: 'Set', pause: 'Pause',
@@ -314,6 +314,12 @@ async function renderAccount() {
 }
 
 // ================= LISTES PROJETS =================
+const matchesArchive = (project, mode) => mode === 'all' || (mode === 'archived' ? !!project.archived_at : !project.archived_at);
+const archiveFilter = () => `<select id="f-archive" aria-label="Afficher les projets">
+  <option value="active">Non archivés</option>
+  <option value="archived">Archivés</option>
+  <option value="all">Tous les projets</option>
+</select>`;
 function projectRow(p, isAdmin, unpaid = 0) {
   return `
   <a class="row-card" href="#/${isAdmin ? 'admin/projets' : 'projets'}/${p.id}">
@@ -323,7 +329,8 @@ function projectRow(p, isAdmin, unpaid = 0) {
       ${isAdmin && p.client ? `<div class="muted">${esc(p.client.full_name || 'Sans nom')}${p.client.email ? ' · ' + esc(p.client.email) : ''}</div>` : ''}
       ${isAdmin && unpaid > 0 ? `<div class="warn-text">Reste à encaisser : ${fmtEur(unpaid)}</div>` : ''}
     </div>
-    <span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>
+    <div class="project-badges"><span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>
+      ${p.archived_at ? '<span class="status done">Archivé</span>' : ''}</div>
   </a>`;
 }
 
@@ -346,7 +353,7 @@ async function renderAdminList() {
   });
 
   const t = today();
-  const active = pj.data.filter(p => p.status !== 'termine');
+  const active = pj.data.filter(p => !p.archived_at && p.status !== 'termine');
   const soon = active.filter(p => p.event_date && p.event_date >= t && p.event_date <= addDays(t, 30)).length;
   const noDate = active.filter(p => !p.event_date).length;
 
@@ -357,31 +364,34 @@ async function renderAdminList() {
     </div>
 
     <div class="stats">
-      <div class="card stat"><span>En cours</span><strong>${active.length}</strong></div>
+      <div class="card stat"><span>Projets actifs</span><strong>${active.length}</strong></div>
       <div class="card stat"><span>Dans les 30 jours</span><strong>${soon}</strong></div>
       <div class="card stat"><span>Sans date</span><strong>${noDate}</strong></div>
       <div class="card stat"><span>Reste à encaisser</span><strong>${fmtEur(totalUnpaid)}</strong></div>
     </div>
 
     <div class="filters">
-      <input id="f-q" placeholder="Rechercher un projet, un client, un lieu…">
-      <select id="f-s">
+      <input id="f-q" placeholder="Rechercher un projet, un client, un lieu…" aria-label="Rechercher un projet">
+      <select id="f-s" aria-label="Statut du projet">
         <option value="">Tous les statuts</option>
         ${STATUS_KEYS.map(k => `<option value="${k}">${STATUS[k]}</option>`).join('')}
       </select>
+      ${archiveFilter()}
     </div>
     <div class="list" id="proj-list"></div>`;
 
   const draw = () => {
     const q = $('#f-q').value.trim().toLowerCase();
     const s = $('#f-s').value;
-    const list = pj.data.filter(p => (!s || p.status === s) &&
+    const archive = $('#f-archive').value;
+    const list = pj.data.filter(p => matchesArchive(p, archive) && (!s || p.status === s) &&
       `${p.title} ${p.location || ''} ${p.client?.full_name || ''} ${p.client?.email || ''}`.toLowerCase().includes(q));
     $('#proj-list').innerHTML = list.map(p => projectRow(p, true, unpaid[p.id] || 0)).join('')
       || '<p class="empty">Aucun projet trouvé.</p>';
   };
   $('#f-q').oninput = draw;
   $('#f-s').onchange = draw;
+  $('#f-archive').onchange = draw;
   draw();
 }
 
@@ -395,8 +405,14 @@ async function renderClientList() {
       <h1>Mes projets</h1>
       <p>Suivez l'avancement de vos événements</p>
     </div></div>
-    <div class="list">${data.map(p => projectRow(p, false)).join('')
-      || '<p class="empty">Aucun projet pour le moment.</p>'}</div>`;
+    <div class="filters">${archiveFilter()}</div>
+    <div class="list" id="client-proj-list"></div>`;
+  const draw = () => {
+    $('#client-proj-list').innerHTML = data.filter(p => matchesArchive(p, $('#f-archive').value))
+      .map(p => projectRow(p, false)).join('') || '<p class="empty">Aucun projet dans cette vue.</p>';
+  };
+  $('#f-archive').onchange = draw;
+  draw();
 }
 
 // ================= ADMIN : NOUVEAU PROJET =================
@@ -868,6 +884,11 @@ async function renderProject(id, isAdmin) {
       </div>
     </div>
 
+    ${p.archived_at ? `<div class="archive-notice" role="status">Projet archivé le ${fmtDateTime(p.archived_at)}. Le contenu et les liens de partage restent accessibles.</div>` : ''}
+    ${isAdmin ? `<div class="actions no-print archive-actions">
+      <button type="button" class="btn" id="archive-project">${p.archived_at ? 'Restaurer le projet' : 'Archiver le projet'}</button>
+      <span class="muted hint">L’archivage conserve le contenu, le statut et les liens de partage.</span>
+    </div>` : ''}
     <div class="grid two">
       ${infoBlock(p, client, isAdmin)}
       ${updatesBlock(up.data, isAdmin, me.id)}
@@ -891,6 +912,19 @@ async function renderProject(id, isAdmin) {
   $('#ics').onclick = () => downloadIcs(p);
   $('#print').onclick = () => window.print();
   bindProjectSharing(id).catch(ERR);
+  const archiveButton = $('#archive-project');
+  if (archiveButton) archiveButton.onclick = async () => {
+    archiveButton.disabled = true;
+    try {
+      const { data, error } = await sb.from('projects').update({
+        archived_at: p.archived_at ? null : new Date().toISOString()
+      }).eq('id', id).select('id').single();
+      if (error) { ERR(error); return; }
+      if (!data) { ERR(new Error('Le projet n’a pas pu être mis à jour.')); return; }
+      toast(p.archived_at ? 'Projet restauré' : 'Projet archivé');
+      await reload();
+    } finally { archiveButton.disabled = false; }
+  };
 
   // Modification du projet (admin)
   const editForm = $('#edit-form');
@@ -1133,13 +1167,13 @@ async function renderInvoice(id) {
 async function renderClientsList() {
   const [cl, pj] = await Promise.all([
     sb.from('profiles').select('*').eq('role', 'client').order('full_name'),
-    sb.from('projects').select('id, client_id, status')
+    sb.from('projects').select('id, client_id, status, archived_at')
   ]);
   if (cl.error) throw cl.error;
   if (pj.error) throw pj.error;
 
   const total = (id) => pj.data.filter(p => p.client_id === id).length;
-  const enCours = (id) => pj.data.filter(p => p.client_id === id && p.status !== 'termine').length;
+  const enCours = (id) => pj.data.filter(p => p.client_id === id && !p.archived_at && p.status !== 'termine').length;
 
   app.innerHTML = `
     <div class="page-head">
@@ -1152,7 +1186,7 @@ async function renderClientsList() {
           <strong>${esc(c.full_name || 'Sans nom')}</strong>
           <div class="muted">${esc(c.email || '')}${c.phone ? ' · ' + esc(c.phone) : ''}</div>
         </div>
-        <span class="status">${enCours(c.id)} en cours · ${total(c.id)} au total</span>
+        <span class="status">${enCours(c.id)} actif(s) · ${total(c.id)} au total</span>
       </a>`).join('') || '<p class="empty">Aucun client pour le moment.</p>'}
     </div>`;
 }
@@ -1204,7 +1238,7 @@ async function renderClient(id) {
 
   const c = cl.data;
   const projects = pj.data;
-  const count = (...ks) => projects.filter(p => ks.includes(p.status)).length;
+  const count = (...ks) => projects.filter(p => !p.archived_at && ks.includes(p.status)).length;
 
   app.innerHTML = `
     <a href="#/admin/clients" class="back">← Clients</a>
@@ -1220,7 +1254,9 @@ async function renderClient(id) {
       <div class="card stat"><span>Projets</span><strong>${projects.length}</strong></div>
       <div class="card stat"><span>En préparation</span><strong>${count('nouveau', 'preparation')}</strong></div>
       <div class="card stat"><span>Validés</span><strong>${count('valide')}</strong></div>
+      <div class="card stat"><span>En cours</span><strong>${count('en_cours')}</strong></div>
       <div class="card stat"><span>Terminés</span><strong>${count('termine')}</strong></div>
+      <div class="card stat"><span>Archivés</span><strong>${projects.filter(p => p.archived_at).length}</strong></div>
     </div>
 
     <div class="grid two" style="margin-top:25px">
