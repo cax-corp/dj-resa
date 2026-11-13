@@ -69,3 +69,12 @@ leurs réponses publiques sont identiques avant et après la modification.
 `tests/project-archiving.sql` vérifie l'archivage, la restauration, les droits et la
 continuité des liens dans une transaction annulée. Le test navigateur couvre aussi
 le nouvel état et les filtres des vues administrateur et client.
+
+## Interface de travail
+
+L'espace connecté utilise une navigation latérale (menu sur mobile), un fil de
+navigation et un répertoire compact des projets avec recherche et filtres. Les
+fiches proposent des accès directs à la vue d'ensemble, à la préparation, à la
+musique, aux finances et au partage. La carte du lieu et les actions de suppression
+sont repliées par défaut. Les thèmes clair/sombre et l'impression sont conservés.
+Cette refonte n'exige aucune modification de la base de données.

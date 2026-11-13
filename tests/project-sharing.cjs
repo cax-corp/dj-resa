@@ -87,7 +87,15 @@ window.supabase = {createClient: () => ({
     assert.equal(await page.locator('.archive-notice').count(),0);
     assert.equal(await page.evaluate(() => window.testState.projects[0].archived_at),null);
     assert.equal(await page.evaluate(() => JSON.stringify(window.testState.shares)),linksBefore);
+    await page.getByRole('button',{name:'Finances',exact:true}).click();
+    assert.equal(await page.locator('.project-navigation button.active').textContent(),'Finances');
+    assert.ok(page.url().endsWith('/admin/projets/'+projectId));
     await page.setViewportSize({width:375,height:812});
+    await page.getByRole('button',{name:'Ouvrir le menu',exact:true}).click();
+    assert.equal(await page.locator('.sidebar').isVisible(),true);
+    assert.equal(await page.locator('#menu-toggle').getAttribute('aria-expanded'),'true');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.sidebar').isVisible(),false);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     page.once('dialog', d => d.accept());
     await page.getByRole('button',{name:'Révoquer',exact:true}).click();
@@ -117,6 +125,6 @@ window.supabase = {createClient: () => ({
     await page.getByRole('heading',{name:'Mon projet',exact:true}).waitFor();
     assert.equal(await page.locator('#archive-project, #edit-form').count(),0);
     assert.deepEqual(errors,[]);
-    console.log('PASS: anonymous rendering, selected sections, read-only controls, invalid/revoked links, escaping, admin link creation/revocation, archive/restore preserves content and links, in-progress status, archive/status filters, mobile layout');
+    console.log('PASS: anonymous rendering, selected sections, read-only controls, invalid/revoked links, escaping, admin link creation/revocation, archive/restore preserves content and links, in-progress status, archive/status filters, workspace navigation, mobile menu and layout');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode=1; });

@@ -102,19 +102,34 @@ const parseHash = () => {
   return { a, b, c, params: new URLSearchParams(query) };
 };
 
+const navIcon = (name) => {
+  const paths = {
+    projects: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    clients: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M15 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',
+    account: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>'
+  };
+  return `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
+};
+
 function renderHeader() {
   const nav = $('#nav');
-  $('#logout').classList.toggle('hidden', !me);
-  if (!me) { nav.innerHTML = ''; return; }
-
   const { a, b } = parseHash();
+  const workspace = !!me && a !== 'partage';
+  document.body.dataset.workspace = String(workspace);
+  $('#logout').classList.toggle('hidden', !me);
+  if (!workspace) { nav.innerHTML = ''; return; }
   const current = a === 'admin' ? (b === 'clients' ? 'admin/clients' : 'admin') : a;
   const links = me.role === 'admin'
-    ? [['admin', 'Projets'], ['admin/clients', 'Clients'], ['compte', 'Mon compte']]
-    : [['projets', 'Mes projets'], ['compte', 'Mon compte']];
-
-  nav.innerHTML = links.map(([p, l]) =>
-    `<a href="#/${p}" class="${current === p ? 'active' : ''}">${l}</a>`).join('');
+    ? [['admin', 'Projets', 'projects'], ['admin/clients', 'Clients', 'clients'], ['compte', 'Mon compte', 'account']]
+    : [['projets', 'Mes projets', 'projects'], ['compte', 'Mon compte', 'account']];
+  nav.innerHTML = links.map(([path, label, icon]) =>
+    `<a href="#/${path}" class="${current === path ? 'active' : ''}" ${current === path ? 'aria-current="page"' : ''}>${navIcon(icon)}<span>${label}</span></a>`).join('');
+  $('#workspace-section').textContent = links.find(([path]) => path === current)?.[1] || 'Projet';
+  $('#workspace-date').textContent = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const name = me.full_name || me.email || (me.role === 'admin' ? 'Administrateur' : 'Mon espace');
+  $('#profile-name').textContent = name;
+  $('#profile-avatar').textContent = name.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
+  $('#profile-role').textContent = me.role === 'admin' ? 'Administrateur' : 'Espace client';
 }
 
 async function route() {
@@ -321,18 +336,22 @@ const archiveFilter = () => `<select id="f-archive" aria-label="Afficher les pro
   <option value="all">Tous les projets</option>
 </select>`;
 function projectRow(p, isAdmin, unpaid = 0) {
+  const date = p.event_date ? new Date(p.event_date + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : 'À définir';
   return `
-  <a class="row-card" href="#/${isAdmin ? 'admin/projets' : 'projets'}/${p.id}">
-    <div>
+  <a class="row-card project-row" href="#/${isAdmin ? 'admin/projets' : 'projets'}/${p.id}">
+    <div class="project-name-cell"><span class="project-file-icon" aria-hidden="true">${navIcon('projects')}</span><div>
       <strong>${esc(p.title)}</strong>
-      <div class="muted">${p.event_date ? fmtDate(p.event_date) : 'Date à définir'}${p.location ? ' · ' + esc(p.location) : ''}</div>
-      ${isAdmin && p.client ? `<div class="muted">${esc(p.client.full_name || 'Sans nom')}${p.client.email ? ' · ' + esc(p.client.email) : ''}</div>` : ''}
-      ${isAdmin && unpaid > 0 ? `<div class="warn-text">Reste à encaisser : ${fmtEur(unpaid)}</div>` : ''}
-    </div>
+      <div class="muted">${isAdmin && p.client ? esc(p.client.full_name || p.client.email || 'Sans nom') : 'Événement'}</div>
+      ${isAdmin && unpaid > 0 ? `<div class="warn-text">${fmtEur(unpaid)} à encaisser</div>` : ''}
+    </div></div>
+    <div class="project-date-cell"><span class="cell-label">Date</span>${esc(date)}</div>
+    <div class="project-location-cell"><span class="cell-label">Lieu</span>${esc(p.location || 'À définir')}</div>
     <div class="project-badges"><span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>
       ${p.archived_at ? '<span class="status done">Archivé</span>' : ''}</div>
+    <span class="row-arrow" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
   </a>`;
 }
+const projectListHead = () => `<div class="project-list-head" aria-hidden="true"><span>Projet / Client</span><span>Date de l’événement</span><span>Lieu</span><span>Statut</span><span></span></div>`;
 
 async function renderAdminList() {
   const [pj, pay] = await Promise.all([
@@ -359,8 +378,8 @@ async function renderAdminList() {
 
   app.innerHTML = `
     <div class="page-head">
-      <div><h1>Projets</h1><p>${pj.data.length} projet(s) au total</p></div>
-      <a class="btn primary" href="#/admin/nouveau">Nouveau projet</a>
+      <div><p class="eyebrow">Gestion des événements</p><h1>Projets</h1><p>Organisez vos prestations, de la préparation au dernier morceau.</p></div>
+      <a class="btn primary" href="#/admin/nouveau"><span aria-hidden="true">＋</span> Nouveau projet</a>
     </div>
 
     <div class="stats">
@@ -370,6 +389,8 @@ async function renderAdminList() {
       <div class="card stat"><span>Reste à encaisser</span><strong>${fmtEur(totalUnpaid)}</strong></div>
     </div>
 
+    <section class="project-register" aria-label="Liste des projets">
+    <div class="register-head"><h2>Répertoire des projets</h2><span id="project-count" class="muted">${pj.data.length} projet(s)</span></div>
     <div class="filters">
       <input id="f-q" placeholder="Rechercher un projet, un client, un lieu…" aria-label="Rechercher un projet">
       <select id="f-s" aria-label="Statut du projet">
@@ -378,7 +399,8 @@ async function renderAdminList() {
       </select>
       ${archiveFilter()}
     </div>
-    <div class="list" id="proj-list"></div>`;
+    ${projectListHead()}
+    <div class="list" id="proj-list"></div></section>`;
 
   const draw = () => {
     const q = $('#f-q').value.trim().toLowerCase();
@@ -386,6 +408,7 @@ async function renderAdminList() {
     const archive = $('#f-archive').value;
     const list = pj.data.filter(p => matchesArchive(p, archive) && (!s || p.status === s) &&
       `${p.title} ${p.location || ''} ${p.client?.full_name || ''} ${p.client?.email || ''}`.toLowerCase().includes(q));
+    $('#project-count').textContent = `${list.length} projet${list.length > 1 ? 's' : ''}`;
     $('#proj-list').innerHTML = list.map(p => projectRow(p, true, unpaid[p.id] || 0)).join('')
       || '<p class="empty">Aucun projet trouvé.</p>';
   };
@@ -405,8 +428,9 @@ async function renderClientList() {
       <h1>Mes projets</h1>
       <p>Suivez l'avancement de vos événements</p>
     </div></div>
-    <div class="filters">${archiveFilter()}</div>
-    <div class="list" id="client-proj-list"></div>`;
+    <section class="project-register" aria-label="Mes projets"><div class="register-head"><h2>Mes événements</h2></div>
+    <div class="filters">${archiveFilter()}</div>${projectListHead()}
+    <div class="list" id="client-proj-list"></div></section>`;
   const draw = () => {
     $('#client-proj-list').innerHTML = data.filter(p => matchesArchive(p, $('#f-archive').value))
       .map(p => projectRow(p, false)).join('') || '<p class="empty">Aucun projet dans cette vue.</p>';
@@ -492,7 +516,7 @@ function infoBlock(p, client, isAdmin) {
         <label>Description<textarea name="description" rows="4">${esc(p.description || '')}</textarea></label>
         <div class="actions" style="margin-top:4px">
           <button class="btn primary">Enregistrer</button>
-          <button type="button" id="delete-project" class="btn danger">Supprimer le projet</button>
+
         </div>
       </form>
       <div class="info-list" style="margin-top:28px">
@@ -502,7 +526,13 @@ function infoBlock(p, client, isAdmin) {
         ${info('Téléphone', client.phone ? `<a href="tel:${phoneHref(client.phone)}">${esc(client.phone)}</a>` : '—')}
       </div>
       <div class="actions"><a class="btn small" href="#/admin/clients/${p.client_id}">Fiche client</a></div>
-      <div class="share-box no-print">
+      <details class="project-danger no-print"><summary>Actions sur le projet</summary><p>La suppression du projet et de son contenu est définitive.</p><button type="button" id="delete-project" class="btn small danger">Supprimer le projet</button></details>
+
+    </section>`;
+}
+
+function sharingBlock() {
+  return `<section id="project-sharing" class="card project-section no-print"><p class="eyebrow">Diffusion</p>      <div class="share-box">
         <strong>Partager le projet en lecture seule</strong>
         <p class="muted">Toute personne disposant du lien pourra consulter les rubriques choisies sans connexion. Le nom du projet est toujours visible. Les rubriques restent à jour.</p>
         <form id="share-form" class="stack">
@@ -515,8 +545,7 @@ function infoBlock(p, client, isAdmin) {
         </form>
         <p class="muted hint">Chaque lien conserve ses propres choix. Pour changer les accès, révoquez le lien et créez-en un nouveau.</p>
         <div id="share-links" class="stack" aria-live="polite"></div>
-      </div>
-    </section>`;
+      </div></section>`;
 }
 
 function updatesBlock(updates, isAdmin, myId) {
@@ -664,15 +693,16 @@ function mapCard(place) {
   if (!place) return '';
   const q = encodeURIComponent(place);
   return `
-  <section class="card map-card" style="margin-top:25px">
-    <div class="map-head">
+  <details class="card map-card" style="margin-top:20px">
+    <summary><strong>Repérage du lieu</strong><span>${esc(place)}</span></summary>
+    <div class="map-content"><div class="map-head">
       <h2>Lieu</h2>
       <a class="btn small no-print" target="_blank" rel="noopener"
          href="https://www.google.com/maps/search/?api=1&query=${q}">Ouvrir dans Maps</a>
     </div>
     <iframe class="map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-      title="Carte du lieu" src="https://www.google.com/maps?q=${q}&output=embed"></iframe>
-  </section>`;
+      title="Carte du lieu" src="https://www.google.com/maps?q=${q}&output=embed"></iframe></div>
+  </details>`;
 }
 
 function scheduleBlock(items, canEdit) {
@@ -884,30 +914,43 @@ async function renderProject(id, isAdmin) {
       </div>
     </div>
 
+    <div class="project-navigation no-print" role="navigation" aria-label="Rubriques du projet">
+      <button type="button" class="active" data-project-section="project-overview">Vue d’ensemble</button>
+      <button type="button" data-project-section="project-preparation">Préparation</button>
+      <button type="button" data-project-section="project-music">Musique</button>
+      <button type="button" data-project-section="project-finance">Finances</button>
+      ${isAdmin ? '<button type="button" data-project-section="project-sharing">Partage</button>' : ''}
+    </div>
     ${p.archived_at ? `<div class="archive-notice" role="status">Projet archivé le ${fmtDateTime(p.archived_at)}. Le contenu et les liens de partage restent accessibles.</div>` : ''}
     ${isAdmin ? `<div class="actions no-print archive-actions">
       <button type="button" class="btn" id="archive-project">${p.archived_at ? 'Restaurer le projet' : 'Archiver le projet'}</button>
       <span class="muted hint">L’archivage conserve le contenu, le statut et les liens de partage.</span>
     </div>` : ''}
-    <div class="grid two">
+    <div id="project-overview" class="grid two project-section">
       ${infoBlock(p, client, isAdmin)}
       ${updatesBlock(up.data, isAdmin, me.id)}
     </div>
 
     ${mapCard(p.location)}
 
-    <div class="extras">
-      ${scheduleBlock(sc.data, canEdit)}
-      ${tasksBlock(tk.data, canEdit)}
-      ${isAdmin ? tariffBlock(base, rp.data) : ''}
-      ${paymentsBlock(pa.data, isAdmin)}
-      ${invoicesBlock(iv.data, isAdmin)}
+    <div id="project-preparation" class="project-section">
+      <div class="section-heading"><p class="eyebrow">Organisation</p><h2>Préparation de l’événement</h2></div>
+      <div class="extras">${scheduleBlock(sc.data, canEdit)}${tasksBlock(tk.data, canEdit)}</div>
     </div>
+    <div id="project-music" class="project-section">
+      <div class="section-heading"><p class="eyebrow">Sélection musicale</p><h2>La bande-son du projet</h2></div>
+      <div class="grid two">${trackPanel('must_play', 'À passer absolument', must, canEdit)}${trackPanel('do_not_play', 'À ne pas passer', avoid, canEdit)}</div>
+    </div>
+    <div id="project-finance" class="project-section">
+      <div class="section-heading"><p class="eyebrow">Gestion</p><h2>Tarifs, règlements et factures</h2></div>
+      <div class="extras">${isAdmin ? tariffBlock(base, rp.data) : ''}${paymentsBlock(pa.data, isAdmin)}${invoicesBlock(iv.data, isAdmin)}</div>
+    </div>
+    ${isAdmin ? sharingBlock() : ''}`;
 
-    <div class="grid two" style="margin-top:25px">
-      ${trackPanel('must_play', 'À passer absolument', must, canEdit)}
-      ${trackPanel('do_not_play', 'À ne pas passer', avoid, canEdit)}
-    </div>`;
+  $$('[data-project-section]').forEach(button => button.onclick = () => {
+    $$('.project-navigation button').forEach(item => item.classList.toggle('active', item === button));
+    document.getElementById(button.dataset.projectSection).scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+  });
 
   $('#ics').onclick = () => downloadIcs(p);
   $('#print').onclick = () => window.print();
@@ -1301,14 +1344,17 @@ const navEl = $('#nav');
 
 function setMenu(open) {
   navEl.classList.toggle('open', open);
+  $('.sidebar').classList.toggle('open', open);
   menuBtn.setAttribute('aria-expanded', String(open));
   menuBtn.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
   menuBtn.textContent = open ? '✕' : '☰';
 }
 
+$('.skip-link').onclick = event => { event.preventDefault(); app.focus(); };
 menuBtn.onclick = () => setMenu(!navEl.classList.contains('open'));
 navEl.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
 window.addEventListener('hashchange', () => setMenu(false));
+window.addEventListener('keydown', event => { if (event.key === 'Escape') setMenu(false); });
 window.addEventListener('resize', () => { if (window.innerWidth > 768) setMenu(false); });
 
 // ================= BOOT =================

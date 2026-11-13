@@ -10,23 +10,31 @@
       localStorage.getItem('theme') ||
       (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   </script>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+  <a class="skip-link" href="#app">Aller au contenu</a>
+  <aside class="sidebar" aria-label="Espace de travail">
+    <a class="brand sidebar-brand" href="#/">DJ<span>Booking</span><small>Espace de travail</small></a>
+    <div class="sidebar-label">Organisation</div>
+    <nav id="nav" aria-label="Navigation principale"></nav>
+    <div class="sidebar-footer"><div class="profile-avatar" id="profile-avatar" aria-hidden="true">DJ</div><div><strong id="profile-name"></strong><span id="profile-role"></span></div></div>
+  </aside>
  <header class="topbar">
   <a class="brand" href="#/">DJ<span>Booking</span></a>
   <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav">☰</button>
-  <nav id="nav"></nav>
+  <div class="workspace-breadcrumb"><span>Espace de travail</span><span aria-hidden="true">/</span><strong id="workspace-section">Projets</strong></div>
   <div class="top-actions">
+    <span id="workspace-date" class="workspace-date"></span>
     <button id="theme-toggle" class="icon-btn" aria-label="Changer le thème"></button>
     <button id="logout" class="btn small hidden">Déconnexion</button>
   </div>
 </header>
 
-  <main id="app" class="container"></main>
+  <main id="app" class="container" tabindex="-1"></main>
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=4" defer></script>
+  <script src="app.js?v=5" defer></script>
 </body>
 </html>
