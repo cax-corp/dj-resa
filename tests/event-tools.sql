@@ -32,17 +32,19 @@ select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting(
 do $$
 declare stock uuid:=current_setting('test.stock')::uuid; p uuid:=current_setting('test.project')::uuid; reservation uuid; rejected boolean; pid uuid; pid2 uuid;
 begin
-  -- Disjoint reservations must not be incorrectly added together.
-  insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(p,stock,1,'2030-01-01','2030-01-02');
-  insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(p,stock,1,'2030-01-03','2030-01-04');
-  insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(p,stock,1,'2030-01-01','2030-01-04') returning id into reservation;
+  -- The same owned equipment may be planned for different projects, without a rental-period lock.
+  insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(p,stock,1,'2030-01-01','2030-01-01') returning id into reservation;
+  insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(current_setting('test.other')::uuid,stock,2,'2030-01-01','2030-01-01');
   rejected:=false;
-  begin insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(current_setting('test.other')::uuid,stock,1,'2030-01-02','2030-01-03'); exception when raise_exception then rejected:=true; end;
-  if not rejected then raise exception 'Overbooking was accepted'; end if;
-  rejected:=false;begin update public.equipment set units=1 where id=stock;exception when raise_exception then rejected:=true;end;
-  if not rejected then raise exception 'Stock reduction broke existing bookings';end if;
-  update public.equipment_reservations set state='returned' where id=reservation;
-  insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(p,stock,1,'2030-01-01','2030-01-04');
+  begin insert into public.equipment_reservations(project_id,equipment_id,quantity,starts_on,ends_on) values(p,stock,2,'2030-01-01','2030-01-01');exception when raise_exception then rejected:=true;end;
+  if not rejected then raise exception 'Project selection exceeds owned quantity';end if;
+  update public.equipment set units=1 where id=stock;
+  if not exists(select 1 from public.equipment_reservations where equipment_id=stock and project_id=current_setting('test.other')::uuid and quantity=2) then raise exception 'Inventory edit changed project history';end if;
+  update public.equipment_reservations set state='loaded' where id=reservation;
+  update public.equipment set units=2 where id=stock;
+  update public.equipment_reservations set state='cancelled' where id=reservation;
+  update public.equipment_reservations set quantity=2,state='reserved' where id=reservation;
+  if (select count(*) from public.equipment_reservations where id=reservation)<>1 then raise exception 'Selection identity was not preserved';end if;
   perform public.set_conductor_step(current_setting('test.step1')::uuid,'current');
   perform public.set_conductor_step(current_setting('test.step2')::uuid,'current');
   if (select count(*) from public.schedule_items where project_id=p and run_state='current')<>1 then raise exception 'Conductor current step not unique';end if;

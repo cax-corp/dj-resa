@@ -17,11 +17,11 @@ const EventTools = (() => {
     rejected: 'Refusé',
     played: 'Joué',
   };
-  const RES_ST = {
-    reserved: 'Réservé',
-    loaded: 'Chargé',
-    returned: 'Retourné',
-    cancelled: 'Annulé',
+  const GEAR_ST = {
+    reserved: 'À préparer',
+    loaded: 'Prêt à emporter',
+    returned: 'Rangé',
+    cancelled: 'Retiré',
   };
   const LEAD_ST = {
     new: 'Nouvelle',
@@ -59,10 +59,15 @@ const EventTools = (() => {
   const equipmentFields = [
     field('name', 'Nom du matériel', 'text', { required: true, max: 200 }),
     field('category', 'Catégorie', 'text', { max: 100 }),
-    field('units', 'Quantité en stock', 'number', { required: true, min: 1, max: 10000, value: 1 }),
+    field('units', 'Quantité que je possède', 'number', {
+      required: true,
+      min: 1,
+      max: 10000,
+      value: 1,
+    }),
     field('reference', 'Référence / numéro de série', 'text', { max: 200 }),
     field('notes', 'Notes et entretien', 'textarea', { max: 2000 }),
-    field('active', 'Disponible à la réservation', 'checkbox', { value: true }),
+    field('active', 'Proposé dans les projets', 'checkbox', { value: true }),
   ];
   const venueFields = [
     field('name', 'Nom du lieu', 'text', { required: true, max: 200 }),
@@ -368,7 +373,7 @@ const EventTools = (() => {
     }
     if (section === 'requests') await musicRequests(p, reload);
     if (section === 'conductor') await conductor(p, editable, reload);
-    if (section === 'equipment') await reservations(p, reload);
+    if (section === 'equipment') await projectEquipment(p, reload);
     if (section === 'documents') await documents(p, reload);
     if (section === 'venue') await projectVenue(p, reload);
     if (section === 'debrief') await debrief(p, reload);
@@ -487,71 +492,153 @@ const EventTools = (() => {
     };
   }
 
-  async function reservations(p, reload) {
-    const [items, stock] = await Promise.all([
-      rows('equipment_reservations', { project_id: p.id }, 'starts_on'),
+  async function projectEquipment(p, reload) {
+    const [items, stock, allChoices, projects] = await Promise.all([
+      rows('equipment_reservations', { project_id: p.id }),
       rows('equipment', {}, 'name'),
+      rows('equipment_reservations'),
+      rows('projects'),
     ]);
+    const selected = items.filter((item) => item.state !== 'cancelled');
+    const available = stock.filter(
+      (gear) => gear.active && !selected.some((item) => item.equipment_id === gear.id)
+    );
     const fields = [
-      field('equipment_id', 'Matériel', 'select', {
+      field('equipment_id', 'Choisir dans mon matériel', 'select', {
         required: true,
         options: Object.fromEntries(
-          stock.filter((x) => x.active).map((x) => [x.id, x.name + ' · stock ' + x.units])
+          available.map((gear) => [gear.id, `${gear.name} · ${gear.units} en ma possession`])
         ),
       }),
-      field('quantity', 'Quantité', 'number', { required: true, min: 1, max: 10000, value: 1 }),
-      field('starts_on', 'Du', 'date', { required: true, value: p.event_date || today() }),
-      field('ends_on', 'Au', 'date', { required: true, value: p.event_date || today() }),
+      field('quantity', 'Quantité à emporter', 'number', {
+        required: true,
+        min: 1,
+        max: 10000,
+        value: 1,
+      }),
     ];
-    $('#tool-content').innerHTML =
-      `<div class="tool-toolbar"><h2>Matériel réservé / chargement</h2><a class="btn" href="#/materiel">Inventaire global</a><button class="btn" id="export-packing">Exporter la liste</button></div>${note('Les réservations en conflit sont bloquées pour toute la période choisie. Un retour ou une annulation libère la réservation.')}<section class="card"><form id="reserve-form" class="stack"><div class="row-2">${fieldsHTML(fields)}</div><button class="btn primary" ${stock.some((x) => x.active) ? '' : 'disabled'}>Réserver</button></form></section><div class="tool-list">${items.map((x) => `<article class="card tool-row"><div><strong>${esc(stock.find((e) => e.id === x.equipment_id)?.name || 'Matériel')}</strong><p>${x.quantity} unité(s) · ${fmtDate(x.starts_on)} → ${fmtDate(x.ends_on)}</p></div><label>État<select data-reservation="${x.id}">${optionList(RES_ST, x.state)}</select></label></article>`).join('') || empty('Aucun matériel réservé.')}</div>`;
-    submit($('#reserve-form'), async (form) => {
-      const values = valuesOf(form, fields);
-      if (values.ends_on < values.starts_on)
-        throw new Error('La date de retour précède le départ.');
-      await write(
-        sb
-          .from('equipment_reservations')
-          .insert({ ...values, project_id: p.id })
-          .select('id')
-          .single(),
-        'Matériel réservé'
+    const overlaps = (gearId) => {
+      if (!p.event_date) return [];
+      return projects.filter(
+        (other) =>
+          other.id !== p.id &&
+          other.event_date === p.event_date &&
+          !other.archived_at &&
+          other.status !== 'termine' &&
+          allChoices.some(
+            (choice) =>
+              choice.project_id === other.id &&
+              choice.equipment_id === gearId &&
+              choice.state !== 'cancelled'
+          )
       );
+    };
+    $('#tool-content').innerHTML =
+      `<div class="tool-toolbar"><h2>Matériel à utiliser pour ce projet</h2><a class="btn" href="#/materiel">Mon matériel</a><button class="btn" id="export-packing">Exporter la checklist</button></div>
+      ${note('Choisissez les éléments de votre propre inventaire et les quantités à emporter. Cochez chaque ligne une fois le matériel prêt.')}
+      <div class="tool-metrics">${mini('Éléments choisis', selected.length)}${mini('Prêts à emporter', selected.filter((item) => item.state === 'loaded').length)}${mini('À préparer', selected.filter((item) => item.state !== 'loaded').length)}</div>
+      <section class="card"><form id="gear-selection-form" class="stack"><div class="row-2">${fieldsHTML(fields)}</div><button class="btn primary" ${available.length ? '' : 'disabled'}>Ajouter au projet</button></form>
+        ${!stock.some((gear) => gear.active) ? '<p class="tool-note">Commencez par ajouter ce que vous possédez dans <a href="#/materiel">Mon matériel</a>.</p>' : !available.length ? '<p class="tool-note">Tout votre matériel disponible figure déjà dans la sélection.</p>' : ''}</section>
+      <div class="tool-list">${
+        selected
+          .map((item) => {
+            const gear = stock.find((gear) => gear.id === item.equipment_id);
+            const others = overlaps(item.equipment_id);
+            return `<article class="card tool-row"><div class="tool-row-content"><strong>${esc(gear?.name || 'Matériel')}</strong><p class="muted">${esc(gear?.category || '')}${gear?.reference ? ' · ' + esc(gear.reference) : ''}</p>
+          ${item.state === 'returned' ? '<span class="status">Rangé</span>' : ''}
+          ${item.quantity > (gear?.units || 0) ? '<p class="warn-text">La quantité choisie dépasse votre inventaire actuel.</p>' : ''}
+          ${others.length ? `<p class="warn-text">Également prévu le même jour sur : ${others.map((other) => `<a href="${toolsUrl(other.id, 'equipment')}">${esc(other.title)}</a>`).join(', ')}. Vérifiez votre organisation.</p>` : ''}
+          <label class="check gear-prepared"><input type="checkbox" data-gear-ready="${item.id}" ${item.state === 'loaded' ? 'checked' : ''}><span>Prêt à emporter</span></label></div>
+          <form class="gear-quantity-form" data-gear-quantity="${item.id}"><label>Quantité à emporter<input name="quantity" type="number" required min="1" max="${gear?.units || 10000}" value="${item.quantity}"></label><button class="btn small">Enregistrer</button></form>
+          <button type="button" class="btn small" data-remove-gear="${item.id}">Retirer du projet</button></article>`;
+          })
+          .join('') || empty('Aucun matériel choisi pour ce projet.')
+      }</div>`;
+    submit($('#gear-selection-form'), async (form) => {
+      const values = valuesOf(form, fields);
+      const gear = available.find((gear) => gear.id === values.equipment_id);
+      if (!gear || values.quantity > gear.units)
+        throw new Error('Choisissez une quantité comprise dans ce que vous possédez.');
+      const previous = items.find(
+        (item) => item.equipment_id === gear.id && item.state === 'cancelled'
+      );
+      const query = previous
+        ? sb
+            .from('equipment_reservations')
+            .update({ quantity: values.quantity, state: 'reserved' })
+            .eq('id', previous.id)
+            .eq('project_id', p.id)
+        : sb
+            .from('equipment_reservations')
+            .insert({
+              ...values,
+              project_id: p.id,
+              starts_on: p.event_date || today(),
+              ends_on: p.event_date || today(),
+              state: 'reserved',
+            });
+      await write(query.select('id').single(), 'Matériel ajouté au projet');
       await reload();
     });
-    $$('[data-reservation]').forEach(
-      (select) =>
-        (select.onchange = async () => {
+    $$('[data-gear-ready]').forEach(
+      (checkbox) =>
+        (checkbox.onchange = async () => {
+          checkbox.disabled = true;
           try {
             await write(
               sb
                 .from('equipment_reservations')
-                .update({ state: select.value })
-                .eq('id', select.dataset.reservation)
+                .update({ state: checkbox.checked ? 'loaded' : 'reserved' })
+                .eq('id', checkbox.dataset.gearReady)
                 .eq('project_id', p.id)
                 .select('id')
-                .single()
+                .single(),
+              'Checklist mise à jour'
             );
             await reload();
-          } catch (e) {
-            ERR(e);
-            await reload();
+          } catch (error) {
+            checkbox.checked = !checkbox.checked;
+            ERR(error);
+            checkbox.disabled = false;
           }
         })
     );
+    $$('[data-gear-quantity]').forEach((form) =>
+      submit(form, async () => {
+        await write(
+          sb
+            .from('equipment_reservations')
+            .update({ quantity: Number(new FormData(form).get('quantity')) })
+            .eq('id', form.dataset.gearQuantity)
+            .eq('project_id', p.id)
+            .select('id')
+            .single()
+        );
+        await reload();
+      })
+    );
+    handle('[data-remove-gear]', async (button) => {
+      await write(
+        sb
+          .from('equipment_reservations')
+          .update({ state: 'cancelled' })
+          .eq('id', button.dataset.removeGear)
+          .eq('project_id', p.id)
+          .select('id')
+          .single(),
+        'Matériel retiré de la sélection'
+      );
+      await reload();
+    });
     $('#export-packing').onclick = () =>
       csv(
-        'chargement.csv',
-        ['Matériel', 'Quantité', 'Du', 'Au', 'État'],
-        items
-          .filter((x) => !['returned', 'cancelled'].includes(x.state))
-          .map((x) => [
-            stock.find((e) => e.id === x.equipment_id)?.name,
-            x.quantity,
-            x.starts_on,
-            x.ends_on,
-            RES_ST[x.state],
-          ])
+        'materiel-projet.csv',
+        ['Mon matériel', 'Quantité à emporter', 'Préparation'],
+        selected.map((item) => [
+          stock.find((gear) => gear.id === item.equipment_id)?.name,
+          item.quantity,
+          GEAR_ST[item.state],
+        ])
       );
   }
 
@@ -735,14 +822,16 @@ const EventTools = (() => {
 
   async function inventory() {
     if (!admin()) throw new Error('Accès réservé à l’administrateur.');
-    const [items, reservations, projects] = await Promise.all([
+    const [items, selections, projects] = await Promise.all([
       rows('equipment', {}, 'name'),
       rows('equipment_reservations', {}, 'starts_on'),
       rows('projects', {}, 'event_date'),
     ]);
     app.innerHTML =
-      head('Matériel', 'Inventaire, réservations et préparation des chargements') +
-      '<div id="tool-content"></div>';
+      head(
+        'Mon matériel',
+        'La liste du matériel que je possède et que je choisis pour mes projets'
+      ) + '<div id="tool-content"></div>';
     collection({
       table: 'equipment',
       title: 'du matériel',
@@ -750,14 +839,14 @@ const EventTools = (() => {
       items,
       after: inventory,
       extra: note(
-        'Les réservations se créent depuis Outils du projet → Matériel. La réduction du stock est refusée si elle rend une réservation existante impossible.'
+        'Renseignez ici votre propre matériel. Dans chaque projet, ouvrez Matériel pour choisir ce que vous emportez et préparer votre checklist.'
       ),
       render: (x) =>
-        `<strong>${esc(x.name)}</strong><span class="status">${x.units} unité(s) · ${x.active ? 'Actif' : 'Indisponible'}</span><p>${esc(x.category)}${x.reference ? ' · ' + esc(x.reference) : ''}</p><p class="pre">${esc(x.notes)}</p>${reservations
-          .filter((r) => r.equipment_id === x.id && !['returned', 'cancelled'].includes(r.state))
+        `<strong>${esc(x.name)}</strong><span class="status">${x.units} unité(s) · ${x.active ? 'Dans mon inventaire' : 'Non proposé dans les projets'}</span><p>${esc(x.category)}${x.reference ? ' · ' + esc(x.reference) : ''}</p><p class="pre">${esc(x.notes)}</p>${selections
+          .filter((r) => r.equipment_id === x.id && r.state !== 'cancelled')
           .map(
             (r) =>
-              `<p class="reservation-line"><a href="${toolsUrl(r.project_id, 'equipment')}">${esc(projects.find((p) => p.id === r.project_id)?.title || 'Projet')}</a> · ${r.quantity} unité(s), ${fmtDate(r.starts_on)} → ${fmtDate(r.ends_on)} · ${RES_ST[r.state]}</p>`
+              `<p class="reservation-line"><a href="${toolsUrl(r.project_id, 'equipment')}">${esc(projects.find((p) => p.id === r.project_id)?.title || 'Projet')}</a> · ${r.quantity} à emporter · ${GEAR_ST[r.state]}</p>`
           )
           .join('')}`,
     });
@@ -1107,7 +1196,7 @@ const EventTools = (() => {
       ['taches', 'À faire', 'tasks'],
       ...(admin()
         ? [
-            ['materiel', 'Matériel', 'equipment'],
+            ['materiel', 'Mon matériel', 'equipment'],
             ['lieux', 'Lieux', 'venue'],
             ['demandes', 'Demandes entrantes', 'inbox'],
           ]

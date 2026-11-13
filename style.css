@@ -1021,3 +1021,10 @@ body:not([data-workspace="true"]) .menu-toggle { display: none; }
     .tool-row > label { width: 100%; }
 }
 .filters .check input { min-width: 16px; max-width: 16px; padding: 0; }
+.gear-prepared { margin-top: 16px; }
+.gear-quantity-form { display: flex; align-items: flex-end; gap: 8px; }
+.gear-quantity-form input { max-width: 110px; }
+#gear-selection-form > button { align-self: flex-start; }
+@media (max-width: 768px) {
+    .gear-quantity-form { width: 100%; }
+}

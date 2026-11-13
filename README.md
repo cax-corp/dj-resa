@@ -85,7 +85,7 @@ Depuis le menu latéral :
 
 - **Calendrier** : prestations du mois, dates à définir, alertes de cumul et périodes d'indisponibilité (administrateur).
 - **À faire** : tableau À faire / En cours / Terminé, échéances, priorités et responsables, à partir des checklists existantes. Les projets archivés se filtrent séparément.
-- **Matériel** : inventaire, quantités, références et disponibilité. Les réservations et listes de chargement se préparent par projet.
+- **Mon matériel** : liste du matériel possédé, quantités, références et notes. Chaque projet permet de sélectionner les éléments à utiliser.
 - **Lieux** : répertoire réutilisable avec accès, stationnement, électricité, contraintes sonores et contacts.
 - **Demandes entrantes** : saisie manuelle ou formulaire public, suivi commercial, dates de relance et conversion en projet rattaché à un client existant. La conversion est transactionnelle et ne crée pas de doublon en cas de répétition.
 
@@ -96,7 +96,7 @@ Depuis les raccourcis de chaque fiche projet :
 - **Conducteur** : planning existant enrichi avec intervenants, morceaux, consignes et états de séquence. Mode direct et impression.
 - **Contacts** : prestataires et intervenants, coordonnées et consignes du projet.
 - **Documents** : dépôt privé, téléchargement, visibilité client explicite et liens temporaires d'une heure. Taille maximale : 20 Mo. Les données déjà téléchargées ne peuvent pas être retirées du destinataire ; masquer au client ne révoque pas un lien signé déjà émis.
-- **Matériel** : réservations sur une période, contrôle du stock et des conflits, états Réservé / Chargé / Retourné / Annulé et export de la liste de chargement. Les dates sont inclusives.
+- **Matériel** : choix dans son propre inventaire, quantités à emporter, checklist « Prêt à emporter » et export CSV. Aucune période de réservation ni retour à saisir. Le même matériel peut être prévu sur plusieurs projets ; une alerte informe s’ils ont lieu le même jour.
 - **Lieu** : association à une fiche du répertoire sans remplacer l'adresse existante du projet.
 - **Bilan** : note globale, retour client, incidents et améliorations, réservés à l'administrateur.
 
@@ -112,5 +112,9 @@ Le code des outils est dans `event-tools.js`. Le générateur QR local est `qrco
 
 - `node --check app.js` et `node --check event-tools.js` : syntaxe.
 - `node tests/event-tools.cjs` : parcours navigateur des onze outils, avec API simulée, export, téléversement/suppression, QR, formulaires publics, conversion, pagination des invités et affichage mobile.
-- `tests/event-tools.sql` : intégration sur la base réelle avec annulation de tous les jeux de test, contrôle des droits, visibilité des fichiers Storage, conflits de stock, conducteur, conversion idempotente et limites des formulaires.
+- `tests/event-tools.sql` : intégration sur la base réelle avec annulation de tous les jeux de test, contrôle des droits, visibilité des fichiers Storage, quantités possédées et conservation des sélections, conducteur, conversion idempotente et limites des formulaires.
 - Les suites de partage et d'archivage restent applicables.
+
+### Matériel personnel
+
+Appliquer `db/personal-equipment.sql` après `db/event-tools.sql` pour une nouvelle installation. Cette migration supprime le blocage par période au profit d'un contrôle des quantités choisies dans chaque projet. Les projets, liens, éléments d'inventaire et sélections existants sont conservés. Les identifiants techniques historiques de table et d'état restent inchangés pour compatibilité ; l'interface ne présente plus de réservation ou de location. Une modification de l'inventaire ne réécrit jamais les listes d'anciens projets.

@@ -83,10 +83,19 @@ window.supabase={createClient:()=>({
     assert.equal((await downloadPromise).suggestedFilename(), 'invites.csv');
     // More than one Data API page must still include every guest.
     await page.evaluate((pid) => {
-      for (let i=0;i<501;i++) window.testState.db.project_guests.push({id:'page-guest-'+i,project_id:pid,full_name:'Guest '+i,response:'pending',companions:0});
-    },pid);
+      for (let i = 0; i < 501; i++)
+        window.testState.db.project_guests.push({
+          id: 'page-guest-' + i,
+          project_id: pid,
+          full_name: 'Guest ' + i,
+          response: 'pending',
+          companions: 0,
+        });
+    }, pid);
     await page.evaluate(() => route());
-    await page.waitForFunction(() => document.querySelectorAll('.tool-list .tool-row').length===502);
+    await page.waitForFunction(
+      () => document.querySelectorAll('.tool-list .tool-row').length === 502
+    );
     // Contacts.
     await tool('contacts');
     form = await editor();
@@ -94,7 +103,7 @@ window.supabase={createClient:()=>({
     await form.locator('[name=role]').fill('Photographe');
     await form.getByRole('button', { name: 'Enregistrer', exact: true }).click();
     await page.getByText('Alex Photo', { exact: true }).waitFor();
-    // Equipment and a reservation / packing state.
+    // Own inventory, per-project selection and a preparation checklist.
     await page.goto(base + '/#/materiel');
     form = await editor();
     await form.locator('[name=name]').fill('Enceinte active');
@@ -102,14 +111,30 @@ window.supabase={createClient:()=>({
     await form.getByRole('button', { name: 'Enregistrer', exact: true }).click();
     await page.getByText('Enceinte active', { exact: true }).waitFor();
     await tool('equipment');
-    form = page.locator('#reserve-form');
+    form = page.locator('#gear-selection-form');
+    assert.equal(await form.locator('input[type=date]').count(), 0);
     await form.locator('[name=quantity]').fill('1');
-    await form.getByRole('button', { name: 'Réserver', exact: true }).click();
-    await page.locator('[data-reservation]').waitFor();
-    await page.locator('[data-reservation]').selectOption('loaded');
+    await form.getByRole('button', { name: 'Ajouter au projet', exact: true }).click();
+    await page.locator('[data-gear-ready]').waitFor();
+    const selectedId = await page.evaluate(() => window.testState.db.equipment_reservations[0].id);
+    await page.locator('[data-gear-ready]').check();
     await page.waitForFunction(
       () => window.testState.db.equipment_reservations[0].state === 'loaded'
     );
+    await page.locator('[data-gear-quantity] input').fill('2');
+    await page.locator('[data-gear-quantity] button').click();
+    await page.waitForFunction(() => window.testState.db.equipment_reservations[0].quantity === 2);
+    await page.getByRole('button', { name: 'Retirer du projet', exact: true }).click();
+    await page.waitForFunction(
+      () => window.testState.db.equipment_reservations[0].state === 'cancelled'
+    );
+    await page.locator('#gear-selection-form button').click();
+    await page.locator('[data-gear-ready]').waitFor();
+    assert.equal(
+      await page.evaluate(() => window.testState.db.equipment_reservations[0].id),
+      selectedId
+    );
+    assert.equal(await page.evaluate(() => window.testState.db.equipment_reservations.length), 1);
     // Reusable venues and per-project association.
     await page.goto(base + '/#/lieux');
     form = await editor();
@@ -138,7 +163,9 @@ window.supabase={createClient:()=>({
     // Task board: create a task, update progress and preserve legacy done flag.
     await page.goto(base + '/#/taches');
     await page.locator('#task-project').waitFor();
-    assert.ok(await page.locator('#task-project').evaluate(el=>el.getBoundingClientRect().height<80));
+    assert.ok(
+      await page.locator('#task-project').evaluate((el) => el.getBoundingClientRect().height < 80)
+    );
     await page.locator('.tool-editor').evaluate((el) => (el.open = true));
     form = page.locator('#board-task-form');
     await form.locator('[name=label]').fill('Préparer les câbles');
@@ -167,13 +194,11 @@ window.supabase={createClient:()=>({
     await page.locator('.calendar-block').first().waitFor();
     // Documents: real file input, private upload metadata, temporary link and visibility.
     await tool('documents');
-    await page
-      .locator('input[type=file]')
-      .setInputFiles({
-        name: 'plan.pdf',
-        mimeType: 'application/pdf',
-        buffer: Buffer.from('%PDF-1.4 test'),
-      });
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'plan.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 test'),
+    });
     await page.getByRole('button', { name: 'Importer le document' }).click();
     await page.getByText('plan.pdf', { exact: true }).waitFor();
     assert.equal(
@@ -184,10 +209,10 @@ window.supabase={createClient:()=>({
     await page.getByRole('textbox', { name: 'Lien temporaire du document' }).waitFor();
     await page.getByRole('button', { name: 'Montrer au client' }).click();
     await page.getByRole('button', { name: 'Masquer au client' }).waitFor();
-    page.once('dialog',dialog=>dialog.accept());
-    await page.getByRole('button',{name:'Retirer',exact:true}).click();
-    await page.waitForFunction(()=>window.testState.db.project_documents.length===0);
-    assert.equal(await page.evaluate(()=>Object.keys(window.testState.files).length),0);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Retirer', exact: true }).click();
+    await page.waitForFunction(() => window.testState.db.project_documents.length === 0);
+    assert.equal(await page.evaluate(() => Object.keys(window.testState.files).length), 0);
     // Internal debrief.
     await tool('debrief');
     form = page.locator('#debrief-form');
@@ -272,7 +297,7 @@ window.supabase={createClient:()=>({
     await page.getByText(/Accès réservé/).waitFor();
     assert.deepEqual(errors, []);
     console.log(
-      'PASS: all 11 tools, CRUD, guest export, conductor, reservations, venue association, task board, calendar, uploads, QR, public music/intake forms, moderation, conversion, mobile and client UI boundaries'
+      'PASS: all 11 tools, CRUD, guest export, conductor, personal equipment selection and checklist, venue association, task board, calendar, uploads, QR, public music/intake forms, moderation, conversion, mobile and client UI boundaries'
     );
   } finally {
     await browser.close();
