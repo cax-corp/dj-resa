@@ -119,7 +119,7 @@ const navIcon = (name) => {
 function renderHeader() {
   const nav = $('#nav');
   const { a, b } = parseHash();
-  const workspace = !!me && !['partage','invites','demande','avis'].includes(a);
+  const workspace = !!me && !['partage','invites','demande','avis','lecture'].includes(a);
   document.body.dataset.workspace = String(workspace);
   $('#logout').classList.toggle('hidden', !me);
   if (!workspace) { nav.innerHTML = ''; return; }
@@ -141,6 +141,7 @@ async function route() {
   document.body.dataset.view = '';
   try {
     const parsed = parseHash();
+    if(parsed.a==='lecture' && parsed.b){renderHeader();return await DocumentViewer.open({token:parsed.b});}
     if (parsed.a === 'partage' && parsed.b) {
       renderHeader();
       return await renderPublicProject(parsed.b);
@@ -159,6 +160,7 @@ async function route() {
 }
 
 async function dispatch({ a, b, c, params }) {
+  if(a==='document' && b)return DocumentViewer.open({id:b});
   if (EventTools.pages[a]) return EventTools.pages[a]({a,b,c,params});
   if (a === 'compte') return renderAccount();
   if (a === 'factures' && b) return renderInvoice(b);

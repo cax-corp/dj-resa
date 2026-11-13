@@ -15,7 +15,7 @@ window.supabase={createClient:()=>({
   let action='select',values,filters=[],single=false,conflict,range=null;
   const q={select:()=>q,range:(start,end)=>{range=[start,end];return q},eq:(key,value)=>{filters.push([key,value]);return q},order:()=>q,single:()=>{single=true;return q},insert:row=>{action='insert';values=row;return q},update:row=>{action='update';values=row;return q},delete:()=>{action='delete';return q},upsert:(row,opt)=>{action='upsert';values=row;conflict=opt?.onConflict||'id';return q},then:resolve=>{
     const state=window.testState;const db=state.db;db[table]||=[];let matched=db[table].filter(x=>filters.every(([k,v])=>x[k]===v));let data;
-    const make=row=>({id:crypto.randomUUID(),created_at:'2026-11-13T12:00:00Z',updated_at:'2026-11-13T12:00:00Z',status:table==='guest_music_requests'?'pending':table==='booking_inquiries'?'new':undefined,state:table==='equipment_reservations'?'reserved':undefined,run_state:table==='schedule_items'?'pending':undefined,is_open:true,token:table==='event_form_links'?(row.kind==='music'?'${musicToken}':row.kind==='feedback'?'10000000-0000-4000-8000-000000000003':'${inquiryToken}'):undefined,...row});
+    const make=row=>({id:crypto.randomUUID(),created_at:'2026-11-13T12:00:00Z',updated_at:'2026-11-13T12:00:00Z',status:table==='guest_music_requests'?'pending':table==='booking_inquiries'?'new':undefined,state:table==='equipment_reservations'?'reserved':undefined,run_state:table==='schedule_items'?'pending':undefined,is_open:true,active:true,token:table==='document_read_links'?crypto.randomUUID():table==='event_form_links'?(row.kind==='music'?'${musicToken}':row.kind==='feedback'?'10000000-0000-4000-8000-000000000003':'${inquiryToken}'):undefined,...row});
     if(action==='insert'){if(Array.isArray(values)){data=values.map(make);db[table].push(...data)}else{data=make(values);db[table].push(data)}}
     else if(action==='upsert'){let existing=db[table].find(x=>x[conflict]===values[conflict]);if(existing){Object.assign(existing,values);data=existing}else{data=make(values);db[table].push(data)}}
     else if(action==='update'){matched.forEach(x=>Object.assign(x,values));if(table==='guest_music_requests'&&values.status==='accepted')matched.forEach(x=>{if(!db.project_tracks.some(t=>t.project_id===x.project_id&&t.kind==='must_play'&&t.title===x.title&&t.artist===x.artist))db.project_tracks.push({id:crypto.randomUUID(),project_id:x.project_id,kind:'must_play',title:x.title,artist:x.artist,note:null});});data=matched}
@@ -220,8 +220,8 @@ window.supabase={createClient:()=>({
       await page.evaluate(() => window.testState.db.project_documents[0].client_visible),
       false
     );
-    await page.getByRole('button', { name: 'Lien temporaire', exact: true }).click();
-    await page.getByRole('textbox', { name: 'Lien temporaire du document' }).waitFor();
+    await page.getByRole('button', { name: 'Partager un lien de lecture', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Lien de lecture du document' }).waitFor();
     await page.getByRole('button', { name: 'Montrer au client' }).click();
     await page.getByRole('button', { name: 'Masquer au client' }).waitFor();
     page.once('dialog', (dialog) => dialog.accept());

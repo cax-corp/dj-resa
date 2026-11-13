@@ -95,7 +95,7 @@ Depuis les raccourcis de chaque fiche projet :
 - **Demandes musicales** : formulaire invité sans connexion, lien et QR code généré localement, modération et fermeture/réouverture des demandes.
 - **Conducteur** : planning existant enrichi avec intervenants, morceaux, consignes et états de séquence. Mode direct et impression.
 - **Contacts** : prestataires et intervenants, coordonnées et consignes du projet.
-- **Documents** : dépôt privé, téléchargement, visibilité client explicite et liens temporaires d'une heure. Taille maximale : 20 Mo. Les données déjà téléchargées ne peuvent pas être retirées du destinataire ; masquer au client ne révoque pas un lien signé déjà émis.
+- **Documents** : dépôt privé, lecteur intégré, téléchargement séparé, visibilité client explicite et liens de lecture révocables. Taille maximale : 20 Mo. Les données déjà téléchargées ne peuvent pas être retirées du destinataire ; masquer au client ne révoque pas un lien de lecture : utiliser son bouton de révocation.
 - **Matériel** : choix dans son propre inventaire, quantités à emporter, checklist « Prêt à emporter » et export CSV. Aucune période de réservation ni retour à saisir. Le même matériel peut être prévu sur plusieurs projets ; une alerte informe s’ils ont lieu le même jour.
 - **Lieu** : choix dans le répertoire, avec un lieu unique repris dans la fiche du projet et ses liens partagés. Les nouveaux projets utilisent exclusivement des lieux du répertoire.
 - **Bilan** : note globale, retour client, incidents et améliorations, réservés à l'administrateur.
@@ -147,3 +147,15 @@ La recherche fonctionne dans les deux vues. L'impression et l'export de la vue t
 La migration `add_native_guest_sheet_save`, décrite dans `db/guest-sheet.sql`, ajoute uniquement la fonction d'enregistrement sécurisée et ne change aucun invité existant à l'installation. Le tableau est implémenté dans `guest-sheet.js`.
 
 Validation : `node tests/guest-sheet.cjs` pour la saisie directe, le clavier, le collage de 160 lignes, les brouillons, les suppressions explicites, l'impression et le mobile ; `tests/guest-sheet.sql` pour l'atomicité, les droits, l'absence de doublons lors d'une répétition et la protection des modifications concurrentes (jeux de test annulés).
+
+## Lecture des documents
+
+**Documents → Consulter** ouvre un lecteur sur le site. PDF, JPEG/PNG/WebP, texte, CSV, Word DOCX (texte) et Excel XLSX (choix de feuille) disposent d'un aperçu. Les tableaux sont limités à 300 lignes et 30 colonnes ; les formules Excel ne sont pas recalculées. Les anciens DOC/XLS restent téléchargeables, et un fichier dont l'aperçu échoue reste téléchargeable. Le téléchargement conserve le fichier original.
+
+**Partager un lien de lecture** crée une adresse du site `#/lecture/<jeton>`, consultable sans connexion pour ce seul document. Le même lien est conservé tant qu'il est actif ; **Révoquer le lien** bloque les prochaines lectures. Les documents restent privés et ne sont jamais ajoutés automatiquement au partage d'un projet. Une révocation ne retire pas une copie déjà chargée par un destinataire. Les anciens liens signés déjà émis restent valides jusqu'à leur expiration normale ; aucun document ou lien existant n'est modifié à l'installation.
+
+Appliquer `db/document-reader.sql` (migration `add_revocable_document_reader_links`) puis déployer `supabase/functions/read-document/index.ts` sous le nom `read-document`, avec `verify_jwt=false`. La fonction vérifie elle-même l'utilisateur et les droits RLS pour la lecture privée, ou un jeton actif propre au document pour une lecture publique. Les variables standard Supabase restent côté serveur. Aucun chemin Storage ni lien signé n'est renvoyé au navigateur. La fonction transmet les fichiers après vérification de l'accès, en lecture inline et sans cache partagé.
+
+`document-viewer.js` charge les lecteurs locaux Mammoth et ExcelJS uniquement lorsque nécessaires ; les documents ne sont pas transmis à un convertisseur tiers. Licences et versions dans `vendor/README.md`.
+
+Validation : `node tests/document-edge.cjs` (authentification et transmission des fichiers), `tests/document-reader.sql` (droits et révocation en transaction annulée), `node tests/document-viewer.cjs` (aperçus des formats, lecture anonyme, révocation, téléchargement et mobile). Les suites existantes restent applicables.

@@ -666,9 +666,12 @@ const EventTools = (() => {
   }
 
   async function documents(p, reload) {
-    const items = await rows('project_documents', { project_id: p.id });
+    const [items, links] = await Promise.all([
+      rows('project_documents', { project_id: p.id }),
+      admin() ? rows('document_read_links') : Promise.resolve([]),
+    ]);
     $('#tool-content').innerHTML =
-      `<div class="tool-toolbar"><h2>Documents du projet</h2></div>${note('Fichiers privés, 20 Mo maximum. PDF, images, texte, CSV, Word et Excel. Aucun document n’est ajouté automatiquement aux liens publics du projet.')}${admin() ? `<section class="card"><form id="document-form" class="stack"><label>Fichier<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx" required></label><label class="check"><input type="checkbox" name="client_visible">Visible par le client connecté du projet</label><button class="btn primary">Importer le document</button></form></section>` : ''}<div class="tool-list">${items.map((x) => `<article class="card tool-row"><div class="tool-row-content"><strong>${esc(x.name)}</strong><p class="muted">${(x.size_bytes / 1024 / 1024).toFixed(2)} Mo · ${fmtDateTime(x.created_at)} · ${x.client_visible ? 'Visible par le client' : 'Interne'}</p><div id="doc-link-${x.id}"></div></div><div class="tool-row-actions"><button class="btn small" data-download="${x.id}">Télécharger</button>${admin() ? `<button class="btn small" data-doc-link="${x.id}">Lien temporaire</button><button class="btn small" data-doc-visible="${x.id}">${x.client_visible ? 'Masquer au client' : 'Montrer au client'}</button><button class="btn small" data-doc-delete="${x.id}">Retirer</button>` : ''}</div></article>`).join('') || empty('Aucun document.')}</div>`;
+      `<div class="tool-toolbar"><h2>Documents du projet</h2></div>${note('Fichiers privés, 20 Mo maximum. PDF, images, texte, CSV, Word et Excel. Aucun document n’est ajouté automatiquement aux liens publics du projet.')}${admin() ? `<section class="card"><form id="document-form" class="stack"><label>Fichier<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx" required></label><label class="check"><input type="checkbox" name="client_visible">Visible par le client connecté du projet</label><button class="btn primary">Importer le document</button></form></section>` : ''}<div class="tool-list">${items.map((x) => `<article class="card tool-row"><div class="tool-row-content"><strong>${esc(x.name)}</strong><p class="muted">${(x.size_bytes / 1024 / 1024).toFixed(2)} Mo · ${fmtDateTime(x.created_at)} · ${x.client_visible ? 'Visible par le client' : 'Interne'}</p><div id="doc-link-${x.id}"></div></div><div class="tool-row-actions"><a class="btn small" href="${DocumentViewer.privateURL(x.id)}">Consulter</a><button class="btn small" data-download="${x.id}">Télécharger</button>${admin() ? `<button class="btn small" data-doc-link="${x.id}">Partager un lien de lecture</button>${links.some((l) => l.document_id === x.id && l.active) ? `<button class="btn small" data-doc-revoke="${x.id}">Révoquer le lien</button>` : ''}<button class="btn small" data-doc-visible="${x.id}">${x.client_visible ? 'Masquer au client' : 'Montrer au client'}</button><button class="btn small" data-doc-delete="${x.id}">Retirer</button>` : ''}</div></article>`).join('') || empty('Aucun document.')}</div>`;
     if (admin())
       submit($('#document-form'), async (form) => {
         const file = form.elements.file.files[0];
@@ -718,28 +721,52 @@ const EventTools = (() => {
         }
         await reload();
       });
-    const signed = async (id) => {
-      const doc = items.find((x) => x.id === id);
-      const { data, error } = await sb.storage
-        .from('project-documents')
-        .createSignedUrl(doc.storage_path, 3600, { download: doc.name });
-      if (error) throw error;
-      return data.signedUrl;
-    };
-    handle('[data-download]', async (button) => {
-      const url = await signed(button.dataset.download);
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.click();
-    });
+    handle('[data-download]', (button) =>
+      DocumentViewer.downloadPrivate(items.find((x) => x.id === button.dataset.download))
+    );
     handle('[data-doc-link]', async (button) => {
-      const url = await signed(button.dataset.docLink);
-      const target = document.getElementById('doc-link-' + button.dataset.docLink);
-      target.innerHTML = `<p class="muted">Toute personne disposant de ce lien peut télécharger ce fichier pendant 1 heure.</p><input readonly aria-label="Lien temporaire du document" value="${esc(url)}">`;
+      const doc = items.find((x) => x.id === button.dataset.docLink);
+      let link = links.find((x) => x.document_id === doc.id && x.active);
+      if (!link) {
+        const result = await sb
+          .from('document_read_links')
+          .insert({ document_id: doc.id })
+          .select('id,token,active,document_id')
+          .single();
+        if (result.error && result.error.code !== '23505') throw result.error;
+        if (result.error) {
+          const { data, error } = await sb
+            .from('document_read_links')
+            .select('*')
+            .eq('document_id', doc.id)
+            .eq('active', true)
+            .single();
+          if (error) throw error;
+          link = data;
+        } else link = result.data;
+        links.push(link);
+      }
+      const url = DocumentViewer.shareURL(link.token);
+      const target = document.getElementById('doc-link-' + doc.id);
+      target.innerHTML = `<p class="muted">Toute personne disposant de ce lien peut consulter ce fichier jusqu’à sa révocation.</p><input readonly aria-label="Lien de lecture du document" value="${esc(url)}"><a class="btn small" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ouvrir le lien de lecture</a><button class="btn small" data-doc-revoke="${doc.id}">Révoquer le lien</button>`;
+      bindRevocation();
       await copy(url);
     });
+    function bindRevocation() {
+      handle('[data-doc-revoke]', async (button) => {
+        if (!confirm('Révoquer le lien de lecture de ce document ?')) return;
+        await write(
+          sb
+            .from('document_read_links')
+            .update({ active: false })
+            .eq('document_id', button.dataset.docRevoke)
+            .eq('active', true),
+          'Lien de lecture révoqué'
+        );
+        await reload();
+      });
+    }
+    bindRevocation();
     handle('[data-doc-visible]', async (button) => {
       const doc = items.find((x) => x.id === button.dataset.docVisible);
       await write(
@@ -755,9 +782,7 @@ const EventTools = (() => {
     });
     handle('[data-doc-delete]', async (button) => {
       if (
-        !confirm(
-          'Retirer ce document ? Les liens temporaires de ce fichier cesseront de fonctionner.'
-        )
+        !confirm('Retirer ce document ? Ses liens de lecture ne donneront plus accès au fichier.')
       )
         return;
       const doc = items.find((x) => x.id === button.dataset.docDelete);
