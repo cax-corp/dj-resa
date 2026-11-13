@@ -32,6 +32,12 @@ window.supabase={createClient:()=>({
   if(name==='set_project_directory_venue'){assignVenue(args.target_project,args.selected_venue);return {data:null,error:null}}
   if(name==='save_catalog_project'){Object.assign(db.projects.find(x=>x.id===args.target_project),args.details);if(args.venue_choice!=='keep')assignVenue(args.target_project,args.venue_choice);return {data:null,error:null}}
   if(name==='create_catalog_project'){const id=crypto.randomUUID();db.projects.push({id,...args.details,status:'nouveau',location:null});if(args.details.venue_id)assignVenue(id,args.details.venue_id);return {data:id,error:null}}
+  if(name==='save_guest_sheet'){
+    if(args.entries.some(x=>!x.full_name))return {data:null,error:{message:'Nom manquant'}};
+    for(const entry of args.entries){const {original,...fields}=entry;const existing=db.project_guests.find(x=>x.id===entry.id);if(existing)Object.assign(existing,fields);else db.project_guests.push({...fields,project_id:args.target_project,created_at:'2026-11-13T12:00:00Z'})}
+    db.project_guests=db.project_guests.filter(x=>!(x.project_id===args.target_project&&args.removed_ids.includes(x.id)));
+    return {data:{saved:args.entries.length,removed:args.removed_ids.length},error:null};
+  }
   if(name==='delete_unused_client'){if(db.projects.some(p=>p.client_id===args.target_client))return {data:null,error:{message:'Ce client possède des projets'}};db.profiles=db.profiles.filter(x=>x.id!==args.target_client);return {data:null,error:null}}
   if(name==='get_event_form'){const f=db.event_form_links.find(x=>x.token===args.form_token);return {data:f?{kind:f.kind,is_open:f.is_open,title:f.kind==='music'||f.kind==='feedback'?'Mariage test':'Demande de prestation DJ'}:null,error:null}}
   if(name==='submit_event_form'){const f=db.event_form_links.find(x=>x.token===args.form_token);if(!f?.is_open)return {data:null,error:{message:'Formulaire fermé'}};s.submissions.push(args);(db[f.kind==='music'?'guest_music_requests':f.kind==='feedback'?'event_feedback':'booking_inquiries']||=[]).push({id:crypto.randomUUID(),project_id:f.project_id,status:f.kind==='music'?'pending':'new',created_at:'2026-11-13T12:00:00Z',message:args.fields.comment,...args.fields});return {data:crypto.randomUUID(),error:null}}
@@ -67,6 +73,7 @@ window.supabase={createClient:()=>({
     };
     // Guests: create, confirm, search, edit, export and no accidental cross-project changes.
     await tool('guests');
+    await page.getByRole('button', { name: 'Vue fiches', exact: true }).click();
     let form = await editor();
     await form.locator('[name=full_name]').fill('Julie Martin');
     await form.locator('[name=response]').selectOption('confirmed');

@@ -135,3 +135,15 @@ Appliquer `db/workflow-fixes.sql` après les migrations précédentes sur une no
 `enhancements.js` contient les brouillons, l'import CSV, les PNG, les feuilles d'impression et le formulaire d'avis. `tests/workflow-fixes.sql` vérifie les lieux, l'acceptation des morceaux, les protections de suppression des clients et les avis dans une transaction annulée. `node tests/workflow-fixes.cjs` couvre les parcours navigateur correspondants, dont un import réel simulé de 160 lignes et les styles d'impression.
 
 Appliquer aussi `db/private-music-comments.sql` après `db/workflow-fixes.sql` (migration `keep_guest_music_comments_private`). Seuls le titre et l’artiste passent de la demande à la playlist ; le message de l’invité reste privé dans les demandes. Les notes déjà saisies manuellement dans les playlists sont conservées.
+
+## Tableau natif des invités
+
+La rubrique **Invités** s'ouvre sur **Vue tableau** : cellules directement modifiables, lignes à ajouter (une ou plusieurs), navigation avec Tab / Entrée et collage d'un bloc de cellules. Aucun fichier n'est nécessaire. **Vue fiches** reste disponible et le choix de présentation est conservé dans l'onglet.
+
+**Enregistrer le tableau** enregistre les nouvelles lignes et les modifications en une transaction. Les lignes vierges sont ignorées. La suppression d'un invité existant est marquée dans le tableau, réversible avant enregistrement, puis confirmée explicitement. Les invités non modifiés ne sont pas réécrits. Les lignes non enregistrées sont conservées en brouillon ; le serveur refuse l'écrasement d'un invité modifié ailleurs depuis l'ouverture du brouillon.
+
+La recherche fonctionne dans les deux vues. L'impression et l'export de la vue tableau reprennent son contenu actuel. Les imports CSV / Excel restent une option séparée. Les droits du projet sont conservés, y compris la lecture seule pour un client dont le projet est terminé.
+
+La migration `add_native_guest_sheet_save`, décrite dans `db/guest-sheet.sql`, ajoute uniquement la fonction d'enregistrement sécurisée et ne change aucun invité existant à l'installation. Le tableau est implémenté dans `guest-sheet.js`.
+
+Validation : `node tests/guest-sheet.cjs` pour la saisie directe, le clavier, le collage de 160 lignes, les brouillons, les suppressions explicites, l'impression et le mobile ; `tests/guest-sheet.sql` pour l'atomicité, les droits, l'absence de doublons lors d'une répétition et la protection des modifications concurrentes (jeux de test annulés).

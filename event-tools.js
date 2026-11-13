@@ -344,28 +344,33 @@ const EventTools = (() => {
         render: (x) =>
           `<strong>${esc(x.full_name)}</strong><span class="status">${ST[x.response]}</span><p>${x.companions} accompagnant(s)${x.table_name ? ' · ' + esc(x.table_name) : ''}</p>${contactLines(x)}${x.dietary ? `<p class="warn-text">Besoins : ${esc(x.dietary)}</p>` : ''}<p class="pre">${esc(x.notes)}</p>`,
       });
-      $('#print-guests').onclick = () => Enhancements.printGuests(p, items);
       Enhancements.mountGuestBulk(p, items, reload, editable);
+      const guestSheet = GuestSheet.mount(p, items, reload, editable);
+      $('#print-guests').onclick = () => Enhancements.printGuests(p, guestSheet.current());
       $('#export-guests').onclick = () =>
         csv(
           'invites.csv',
           ['Nom', 'Réponse', 'Accompagnants', 'Table', 'Email', 'Téléphone', 'Besoins', 'Notes'],
-          items.map((x) => [
-            x.full_name,
-            ST[x.response],
-            x.companions,
-            x.table_name,
-            x.email,
-            x.phone,
-            x.dietary,
-            x.notes,
-          ])
+          guestSheet
+            .current()
+            .map((x) => [
+              x.full_name,
+              ST[x.response],
+              x.companions,
+              x.table_name,
+              x.email,
+              x.phone,
+              x.dietary,
+              x.notes,
+            ])
         );
-      $('#guest-search').oninput = (event) =>
+      $('#guest-search').oninput = (event) => {
+        guestSheet.filter(event.target.value);
         $$('.tool-list .tool-row').forEach(
           (row) =>
             (row.hidden = !row.textContent.toLowerCase().includes(event.target.value.toLowerCase()))
         );
+      };
     }
     if (section === 'contacts') {
       const items = await rows('project_contacts', { project_id: id }, 'full_name');
