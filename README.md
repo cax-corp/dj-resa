@@ -78,3 +78,39 @@ fiches proposent des accès directs à la vue d'ensemble, à la préparation, à
 musique, aux finances et au partage. La carte du lieu et les actions de suppression
 sont repliées par défaut. Les thèmes clair/sombre et l'impression sont conservés.
 Cette refonte n'exige aucune modification de la base de données.
+
+## Outils événementiels
+
+Depuis le menu latéral :
+
+- **Calendrier** : prestations du mois, dates à définir, alertes de cumul et périodes d'indisponibilité (administrateur).
+- **À faire** : tableau À faire / En cours / Terminé, échéances, priorités et responsables, à partir des checklists existantes. Les projets archivés se filtrent séparément.
+- **Matériel** : inventaire, quantités, références et disponibilité. Les réservations et listes de chargement se préparent par projet.
+- **Lieux** : répertoire réutilisable avec accès, stationnement, électricité, contraintes sonores et contacts.
+- **Demandes entrantes** : saisie manuelle ou formulaire public, suivi commercial, dates de relance et conversion en projet rattaché à un client existant. La conversion est transactionnelle et ne crée pas de doublon en cas de répétition.
+
+Depuis les raccourcis de chaque fiche projet :
+
+- **Invités** : confirmations, accompagnants, groupes/tables, allergies, recherche et export CSV.
+- **Demandes musicales** : formulaire invité sans connexion, lien et QR code généré localement, modération et fermeture/réouverture des demandes.
+- **Conducteur** : planning existant enrichi avec intervenants, morceaux, consignes et états de séquence. Mode direct et impression.
+- **Contacts** : prestataires et intervenants, coordonnées et consignes du projet.
+- **Documents** : dépôt privé, téléchargement, visibilité client explicite et liens temporaires d'une heure. Taille maximale : 20 Mo. Les données déjà téléchargées ne peuvent pas être retirées du destinataire ; masquer au client ne révoque pas un lien signé déjà émis.
+- **Matériel** : réservations sur une période, contrôle du stock et des conflits, états Réservé / Chargé / Retourné / Annulé et export de la liste de chargement. Les dates sont inclusives.
+- **Lieu** : association à une fiche du répertoire sans remplacer l'adresse existante du projet.
+- **Bilan** : note globale, retour client, incidents et améliorations, réservés à l'administrateur.
+
+Les invités, contacts et conducteurs sont accessibles aux utilisateurs connectés autorisés sur le projet, selon les droits existants. Le client ne voit que les documents explicitement rendus visibles pour lui. L'inventaire, les lieux, les demandes commerciales, les suggestions musicales à modérer et les bilans sont administrateur uniquement. Les formulaires publics ne permettent ni de lister d'autres réponses, ni de consulter les données privées du projet.
+
+Les liens publics du projet conservent leurs rubriques précédentes : aucun nouvel outil ou fichier n'y est exposé automatiquement. Les formulaires invités et commerciaux ont leurs propres jetons. Chaque lien accepte jusqu'à 20 suggestions musicales par minute et 500 au total, ou 10 demandes commerciales par minute et 1 000 au total. Un administrateur peut fermer un formulaire ou créer un nouveau lien.
+
+### Installation et validation
+
+La migration Supabase `add_event_operations_tools` est enregistrée dans `db/event-tools.sql` et appliquée au projet configuré. Pour une autre installation, l'exécuter après les scripts de partage et d'archivage. Elle ajoute des tables avec RLS, enrichit les tâches et le planning, crée le bucket privé `project-documents` et vérifie la conservation des données existantes.
+
+Le code des outils est dans `event-tools.js`. Le générateur QR local est `qrcode-generator` 1.4.4 (licence MIT, voir `vendor/`). Aucune valeur du formulaire n'est envoyée à un service de QR code tiers.
+
+- `node --check app.js` et `node --check event-tools.js` : syntaxe.
+- `node tests/event-tools.cjs` : parcours navigateur des onze outils, avec API simulée, export, téléversement/suppression, QR, formulaires publics, conversion, pagination des invités et affichage mobile.
+- `tests/event-tools.sql` : intégration sur la base réelle avec annulation de tous les jeux de test, contrôle des droits, visibilité des fichiers Storage, conflits de stock, conducteur, conversion idempotente et limites des formulaires.
+- Les suites de partage et d'archivage restent applicables.

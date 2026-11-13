@@ -106,6 +106,11 @@ const navIcon = (name) => {
   const paths = {
     projects: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     clients: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M15 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2m4 0h2"/>',
+    tasks: '<path d="m3 6 2 2 4-4m3 2h9M3 13l2 2 4-4m3 2h9M3 20l2 2 4-4m3 2h9"/>',
+    equipment: '<rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="15" r="4"/><circle cx="12" cy="6" r="1"/>',
+    venue: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+    inbox: '<path d="M3 4h18v16H3zM3 13h5l2 3h4l2-3h5M8 8h8"/>',
     account: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>'
   };
   return `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
@@ -114,14 +119,14 @@ const navIcon = (name) => {
 function renderHeader() {
   const nav = $('#nav');
   const { a, b } = parseHash();
-  const workspace = !!me && a !== 'partage';
+  const workspace = !!me && !['partage','invites','demande'].includes(a);
   document.body.dataset.workspace = String(workspace);
   $('#logout').classList.toggle('hidden', !me);
   if (!workspace) { nav.innerHTML = ''; return; }
-  const current = a === 'admin' ? (b === 'clients' ? 'admin/clients' : 'admin') : a;
+  const current = a === 'outils' ? (me.role === 'admin' ? 'admin' : 'projets') : a === 'admin' ? (b === 'clients' ? 'admin/clients' : 'admin') : a;
   const links = me.role === 'admin'
-    ? [['admin', 'Projets', 'projects'], ['admin/clients', 'Clients', 'clients'], ['compte', 'Mon compte', 'account']]
-    : [['projets', 'Mes projets', 'projects'], ['compte', 'Mon compte', 'account']];
+    ? [['admin', 'Projets', 'projects'], ['admin/clients', 'Clients', 'clients'], ...EventTools.navLinks(), ['compte', 'Mon compte', 'account']]
+    : [['projets', 'Mes projets', 'projects'], ...EventTools.navLinks(), ['compte', 'Mon compte', 'account']];
   nav.innerHTML = links.map(([path, label, icon]) =>
     `<a href="#/${path}" class="${current === path ? 'active' : ''}" ${current === path ? 'aria-current="page"' : ''}>${navIcon(icon)}<span>${label}</span></a>`).join('');
   $('#workspace-section').textContent = links.find(([path]) => path === current)?.[1] || 'Projet';
@@ -140,6 +145,10 @@ async function route() {
       renderHeader();
       return await renderPublicProject(parsed.b);
     }
+    if (['invites','demande'].includes(parsed.a) && parsed.b) {
+      renderHeader();
+      return await EventTools.publicForm(parsed.b,parsed.a==='invites'?'music':'inquiry');
+    }
     await loadMe();
     renderHeader();
     if (!me) return renderLogin();
@@ -150,6 +159,7 @@ async function route() {
 }
 
 async function dispatch({ a, b, c, params }) {
+  if (EventTools.pages[a]) return EventTools.pages[a]({a,b,c,params});
   if (a === 'compte') return renderAccount();
   if (a === 'factures' && b) return renderInvoice(b);
 
@@ -926,6 +936,7 @@ async function renderProject(id, isAdmin) {
       <button type="button" class="btn" id="archive-project">${p.archived_at ? 'Restaurer le projet' : 'Archiver le projet'}</button>
       <span class="muted hint">L’archivage conserve le contenu, le statut et les liens de partage.</span>
     </div>` : ''}
+    ${EventTools.shortcuts(id)}
     <div id="project-overview" class="grid two project-section">
       ${infoBlock(p, client, isAdmin)}
       ${updatesBlock(up.data, isAdmin, me.id)}

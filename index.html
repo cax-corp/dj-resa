@@ -10,7 +10,7 @@
       localStorage.getItem('theme') ||
       (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   </script>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -35,6 +35,8 @@
   <main id="app" class="container" tabindex="-1"></main>
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=5" defer></script>
+  <script src="vendor/qrcode.js?v=1.4.4" defer></script>
+  <script src="event-tools.js?v=6" defer></script>
+  <script src="app.js?v=6" defer></script>
 </body>
 </html>
