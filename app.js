@@ -119,7 +119,7 @@ const navIcon = (name) => {
 function renderHeader() {
   const nav = $('#nav');
   const { a, b } = parseHash();
-  const workspace = !!me && !['partage','invites','demande'].includes(a);
+  const workspace = !!me && !['partage','invites','demande','avis'].includes(a);
   document.body.dataset.workspace = String(workspace);
   $('#logout').classList.toggle('hidden', !me);
   if (!workspace) { nav.innerHTML = ''; return; }
@@ -145,9 +145,9 @@ async function route() {
       renderHeader();
       return await renderPublicProject(parsed.b);
     }
-    if (['invites','demande'].includes(parsed.a) && parsed.b) {
+    if (['invites','demande','avis'].includes(parsed.a) && parsed.b) {
       renderHeader();
-      return await EventTools.publicForm(parsed.b,parsed.a==='invites'?'music':'inquiry');
+      return await EventTools.publicForm(parsed.b,parsed.a==='invites'?'music':parsed.a==='avis'?'feedback':'inquiry');
     }
     await loadMe();
     renderHeader();
@@ -454,6 +454,7 @@ async function renderNewProject(preClient = '') {
   const { data: clients, error } = await sb.from('profiles')
     .select('id, full_name, email').eq('role', 'client').order('full_name');
   if (error) throw error;
+  const venues=await EventTools.getVenues();
 
   app.innerHTML = `
     <a href="#/admin" class="back">← Projets</a>
@@ -472,7 +473,7 @@ async function renderNewProject(preClient = '') {
         <label>Nom du projet / événement<input name="title" required></label>
         <div class="row-2">
           <label>Date<input type="date" name="event_date"></label>
-          <label>Lieu<input name="location" placeholder="Adresse complète, avec la ville"></label>
+          <label>Lieu du répertoire<select name="venue_id"><option value="">À définir</option>${venues.map(v=>`<option value="${v.id}">${esc(v.name)}${v.address?' · '+esc(v.address):''}</option>`).join('')}</select><a href="#/lieux">Créer un lieu dans le répertoire →</a></label>
         </div>
         <label>Description<textarea name="description" rows="4"></textarea></label>
         <button class="btn primary" ${clients.length ? '' : 'disabled'}>Créer le projet</button>
@@ -482,21 +483,16 @@ async function renderNewProject(preClient = '') {
   $('#new-project').onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    const { data, error } = await sb.from('projects').insert({
-      client_id: f.client_id,
-      title: f.title.trim(),
-      event_date: f.event_date || null,
-      location: f.location.trim() || null,
-      description: f.description.trim() || null
-    }).select().single();
+    const { data, error } = await sb.rpc('create_catalog_project', {details:f});
     if (error) return ERR(error);
+    Drafts.clear(e.target);
     toast('Projet créé');
-    go('admin/projets/' + data.id);
+    go('admin/projets/' + data);
   };
 }
 
 // ================= BLOCS DU PROJET =================
-function infoBlock(p, client, isAdmin) {
+function infoBlock(p, client, isAdmin, venues = [], venueId = '') {
   if (!isAdmin) {
     return `
     <section class="card">
@@ -520,7 +516,7 @@ function infoBlock(p, client, isAdmin) {
         <label>Nom<input name="title" value="${esc(p.title)}" required></label>
         <div class="row-2">
           <label>Date<input type="date" name="event_date" value="${p.event_date || ''}"></label>
-          <label>Lieu<input name="location" value="${esc(p.location || '')}"></label>
+          <label>Lieu du répertoire<select name="venue_id"><option value="">À définir</option>${!venueId && p.location ? `<option value="keep" selected>Lieu enregistré : ${esc(p.location)}</option>` : ''}${venues.map(v=>`<option value="${v.id}" ${v.id===venueId?'selected':''}>${esc(v.name)}${v.address?' · '+esc(v.address):''}</option>`).join('')}</select><a href="#/lieux">Créer un lieu dans le répertoire →</a></label>
         </div>
         <label>Statut<select name="status">${statusOptions}</select></label>
         <label>Description<textarea name="description" rows="4">${esc(p.description || '')}</textarea></label>
@@ -888,7 +884,7 @@ function downloadIcs(p) {
 async function renderProject(id, isAdmin) {
   if (!me) return renderLogin();
   const none = Promise.resolve({ data: [], error: null });
-  const [pr, up, tr, sc, tk, pa, iv, rp] = await Promise.all([
+  const [pr, up, tr, sc, tk, pa, iv, rp, vn, pv] = await Promise.all([
     sb.from('projects').select('*, client:profiles!client_id(full_name, email, phone, company, billing_address)').eq('id', id).single(),
     sb.from('project_updates').select('*').eq('project_id', id).order('created_at', { ascending: false }),
     sb.from('project_tracks').select('*').eq('project_id', id).order('created_at'),
@@ -896,9 +892,11 @@ async function renderProject(id, isAdmin) {
     sb.from('project_tasks').select('*').eq('project_id', id).order('created_at'),
     sb.from('project_payments').select('*').eq('project_id', id).order('created_at'),
     sb.from('invoices').select('id, number, issue_date, total').eq('project_id', id).order('created_at', { ascending: false }),
-    isAdmin ? sb.from('rate_plans').select('*').order('name') : none
+    isAdmin ? sb.from('rate_plans').select('*').order('name') : none,
+    isAdmin ? sb.from('venues').select('*').order('name') : none,
+    isAdmin ? sb.from('project_venues').select('venue_id').eq('project_id',id) : none
   ]);
-  for (const r of [pr, up, tr, sc, tk, pa, iv, rp]) if (r.error) throw r.error;
+  for (const r of [pr, up, tr, sc, tk, pa, iv, rp, vn, pv]) if (r.error) throw r.error;
 
   const p = pr.data;
   const client = p.client || {};
@@ -938,7 +936,7 @@ async function renderProject(id, isAdmin) {
     </div>` : ''}
     ${EventTools.shortcuts(id)}
     <div id="project-overview" class="grid two project-section">
-      ${infoBlock(p, client, isAdmin)}
+      ${infoBlock(p, client, isAdmin, vn.data, pv.data[0]?.venue_id)}
       ${updatesBlock(up.data, isAdmin, me.id)}
     </div>
 
@@ -949,7 +947,7 @@ async function renderProject(id, isAdmin) {
       <div class="extras">${scheduleBlock(sc.data, canEdit)}${tasksBlock(tk.data, canEdit)}</div>
     </div>
     <div id="project-music" class="project-section">
-      <div class="section-heading"><p class="eyebrow">Sélection musicale</p><h2>La bande-son du projet</h2></div>
+      <div class="section-heading"><p class="eyebrow">Sélection musicale</p><h2>La bande-son du projet</h2></div><div class="actions no-print music-print-actions"><button class="btn small" id="print-must-play">Imprimer « À passer absolument »</button></div>
       <div class="grid two">${trackPanel('must_play', 'À passer absolument', must, canEdit)}${trackPanel('do_not_play', 'À ne pas passer', avoid, canEdit)}</div>
     </div>
     <div id="project-finance" class="project-section">
@@ -965,6 +963,7 @@ async function renderProject(id, isAdmin) {
 
   $('#ics').onclick = () => downloadIcs(p);
   $('#print').onclick = () => window.print();
+  $('#print-must-play').onclick = () => Enhancements.printMusic(p,must);
   bindProjectSharing(id).catch(ERR);
   const archiveButton = $('#archive-project');
   if (archiveButton) archiveButton.onclick = async () => {
@@ -986,13 +985,7 @@ async function renderProject(id, isAdmin) {
     editForm.onsubmit = async (e) => {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
-      if (await run(sb.from('projects').update({
-        title: f.title.trim(),
-        event_date: f.event_date || null,
-        location: f.location.trim() || null,
-        description: f.description.trim() || null,
-        status: f.status
-      }).eq('id', id), 'Projet enregistré')) reload();
+      if (await run(sb.rpc('save_catalog_project', {target_project:id,details:{title:f.title.trim(),event_date:f.event_date||null,status:f.status,description:f.description.trim()||null},venue_choice:f.venue_id}), 'Projet enregistré')) { Drafts.clear(e.target); reload(); }
     };
     $('#delete-project').onclick = async () => {
       if (!confirm('Supprimer ce projet et tout son contenu ? Cette action est définitive.')) return;
@@ -1234,15 +1227,28 @@ async function renderClientsList() {
       <div><h1>Clients</h1><p>${cl.data.length} client(s)</p></div>
       <a class="btn primary" href="#/admin/clients/nouveau">Nouveau client</a>
     </div>
+    <div class="tool-toolbar"><label class="check"><input type="checkbox" id="select-unused-clients">Sélectionner les clients sans projet</label><button class="btn danger" id="batch-delete-clients" disabled>Supprimer la sélection</button></div>
     <div class="list">${cl.data.map(c => `
+      <div class="client-selection-row"><input type="checkbox" data-delete-client="${c.id}" aria-label="Sélectionner ${esc(c.full_name || c.email)}" ${total(c.id)?'disabled title="Ce client possède des projets"':''}>
       <a class="row-card" href="#/admin/clients/${c.id}">
         <div>
           <strong>${esc(c.full_name || 'Sans nom')}</strong>
           <div class="muted">${esc(c.email || '')}${c.phone ? ' · ' + esc(c.phone) : ''}</div>
         </div>
         <span class="status">${enCours(c.id)} actif(s) · ${total(c.id)} au total</span>
-      </a>`).join('') || '<p class="empty">Aucun client pour le moment.</p>'}
+      </a></div>`).join('') || '<p class="empty">Aucun client pour le moment.</p>'}
     </div>`;
+  const updateSelection=()=>{const count=$$('[data-delete-client]:checked').length;$('#batch-delete-clients').disabled=!count;$('#batch-delete-clients').textContent=count?`Supprimer ${count} client(s)`:'Supprimer la sélection';};
+  $$('[data-delete-client]').forEach(input=>input.onchange=updateSelection);
+  $('#select-unused-clients').onchange=e=>{$$('[data-delete-client]:not(:disabled)').forEach(input=>input.checked=e.target.checked);updateSelection();};
+  $('#batch-delete-clients').onclick=async()=>{
+    const ids=$$('[data-delete-client]:checked').map(input=>input.dataset.deleteClient);
+    const names=ids.map(id=>{const c=cl.data.find(c=>c.id===id);return c.full_name||c.email;});
+    if(!confirm(`Supprimer définitivement ces ${ids.length} comptes clients ?\n\n${names.join('\n')}\n\nLes comptes liés à des projets ou à un historique seront conservés.`))return;
+    $('#batch-delete-clients').disabled=true;let removed=0;const kept=[];
+    for(const id of ids){const {error}=await sb.rpc('delete_unused_client',{target_client:id});if(error)kept.push(cl.data.find(c=>c.id===id)?.full_name||id);else removed++;}
+    await renderClientsList();toast(`${removed} client(s) supprimé(s)${kept.length?` · ${kept.length} conservé(s) (historique ou droits)` : ''}`,!kept.length);
+  };
 }
 
 function renderNewClient() {
@@ -1276,6 +1282,7 @@ function renderNewClient() {
       return ERR(new Error(msg));
     }
     if (data?.error) return ERR(new Error(data.error));
+    Drafts.clear(e.target);
     toast('Client créé');
     go('admin/clients/' + data.id);
   };
@@ -1301,7 +1308,7 @@ async function renderClient(id) {
         <h1>${esc(c.full_name || 'Sans nom')}</h1>
         <p>Client depuis le ${new Date(c.created_at).toLocaleDateString('fr-FR')}</p>
       </div>
-      <a class="btn primary" href="#/admin/nouveau?client=${c.id}">Nouveau projet pour ce client</a>
+      <div class="actions"><a class="btn primary" href="#/admin/nouveau?client=${c.id}">Nouveau projet pour ce client</a><button class="btn danger" id="delete-client" ${projects.length?'disabled title="Réaffectez les projets de ce client avant de le supprimer"':''}>Supprimer le client</button></div>
     </div>
 
     <div class="stats">
@@ -1337,6 +1344,12 @@ async function renderClient(id) {
       </section>
     </div>`;
 
+  $('#delete-client').onclick = async () => {
+    if(!confirm(`Supprimer définitivement le compte client de ${c.full_name || c.email} ? Ses projets éventuels bloqueront la suppression.`))return;
+    $('#delete-client').disabled=true;
+    if(await run(sb.rpc('delete_unused_client',{target_client:id}),'Client supprimé')) {Drafts.clear($('#client-form'));go('admin/clients');}
+    else $('#delete-client').disabled=false;
+  };
   $('#client-form').onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
@@ -1345,7 +1358,7 @@ async function renderClient(id) {
       phone: f.phone.trim() || null,
       company: f.company.trim() || null,
       billing_address: f.billing_address.trim() || null
-    }).eq('id', id), 'Coordonnées enregistrées')) renderClient(id);
+    }).eq('id', id), 'Coordonnées enregistrées')) {Drafts.clear(e.target);renderClient(id);}
   };
 }
 
@@ -1373,8 +1386,9 @@ $('#theme-toggle').onclick = () =>
   setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 $('#logout').onclick = () => sb.auth.signOut();
 window.addEventListener('hashchange', route);
-sb.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') me = null;
+sb.auth.onAuthStateChange((event, session) => {
+  if(event==='SIGNED_IN' && session?.user?.id===me?.id)return;
+  if (event === 'SIGNED_OUT') {if(me)Drafts.clearUser(me.id);me = null;}
   if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') route();
 });
 

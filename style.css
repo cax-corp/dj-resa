@@ -1028,3 +1028,44 @@ body:not([data-workspace="true"]) .menu-toggle { display: none; }
 @media (max-width: 768px) {
     .gear-quantity-form { width: 100%; }
 }
+
+/* Bulk guests, feedback and isolated paper lists. */
+.guest-grid-scroll { overflow-x: auto; max-width: 100%; }
+.guest-import-table { border-collapse: collapse; min-width: 1100px; width: 100%; }
+.guest-import-table th, .guest-import-table td { padding: 6px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.guest-import-table th { background: var(--bg-alt); font-size: 11px; }
+.guest-import-table input:not([type=checkbox]), .guest-import-table select { min-width: 140px; font-size: 12px; }
+.guest-import-table input[type=checkbox] { width: 18px; height: 18px; }
+.guest-import-table small { display: block; min-width: 80px; color: var(--warn); }
+.guest-bulk { margin-top: 16px; min-width: 0; }
+.rating-field { padding: 16px; border: 1px solid var(--border); border-radius: 4px; }
+.rating-field legend { padding: 0 6px; font-size: 12px; }
+.rating-stars { display: flex; gap: 10px; }
+.rating-stars label { position: relative; cursor: pointer; }
+.rating-stars input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.rating-stars span { font-size: 36px; line-height: 1.2; color: var(--text-lighter); }
+.rating-stars .selected span { color: #c58a12; }
+.rating-stars input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 3px; }
+.feedback-panel { margin-top: 28px; }
+.music-print-actions { margin: 12px 0 16px; }
+.print-sheet { display: none; }
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body[data-print="sheet"] > *:not(#print-sheet) { display: none !important; }
+  body[data-print="sheet"] { background: #fff !important; color: #000 !important; }
+  body[data-print="sheet"] #print-sheet { display: block !important; background: #fff; color: #000; font: 11pt Arial,sans-serif; }
+  .print-sheet header { display: block; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 18px; }
+  .print-sheet h1 { font-size: 20pt; margin: 6px 0; color: #000; }
+  .print-sheet p { font-size: 10pt; }
+  .print-sheet table { width: 100%; border-collapse: collapse; }
+  .print-sheet thead { display: table-header-group; }
+  .print-sheet th, .print-sheet td { border: 1px solid #888; padding: 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  .print-sheet tr { break-inside: avoid; }
+  .print-sheet .paper-check-col { width: 28px; }
+  .paper-checkbox { display: inline-block; width: 12px; height: 12px; border: 1.5px solid #000; }
+  .print-sheet footer { margin-top: 16px; font-size: 9pt; color: #444; }
+}
+.guest-import-table textarea { min-width: 180px; min-height: 42px; font-size: 12px; }
+.client-selection-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.client-selection-row > input { width: 18px; height: 18px; flex: 0 0 18px; }
+.client-selection-row > .row-card { flex: 1; min-width: 0; }

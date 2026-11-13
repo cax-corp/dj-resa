@@ -10,15 +10,15 @@ window.testState={signedIn:true,role:'admin',files:{},submissions:[],calls:[],db
  projects:[{id:'${pid}',client_id:'client',title:'Mariage test',status:'preparation',event_date:'2026-12-12',location:'Lyon',client:{full_name:'Camille Test'}},{id:'other-project',client_id:'client',title:'Autre soirée',status:'valide',event_date:'2026-12-12'}],
  project_guests:[],project_contacts:[],equipment:[],equipment_reservations:[],venues:[],project_venues:[],calendar_blocks:[],project_tasks:[],project_documents:[],project_debriefs:[],schedule_items:[],guest_music_requests:[],booking_inquiries:[],event_form_links:[],project_shares:[],project_updates:[],project_tracks:[],project_payments:[],invoices:[],rate_plans:[]}};
 window.supabase={createClient:()=>({
- auth:{getSession:async()=>({data:{session:window.testState.signedIn?{user:{id:window.testState.role==='admin'?'admin':'client'}}:null}}),onAuthStateChange:()=>{}},
+ auth:{getSession:async()=>({data:{session:window.testState.signedIn?{user:{id:window.testState.role==='admin'?'admin':'client'}}:null}}),onAuthStateChange:callback=>{window.testState.authCallback=callback;}},
  from:table=>{
   let action='select',values,filters=[],single=false,conflict,range=null;
   const q={select:()=>q,range:(start,end)=>{range=[start,end];return q},eq:(key,value)=>{filters.push([key,value]);return q},order:()=>q,single:()=>{single=true;return q},insert:row=>{action='insert';values=row;return q},update:row=>{action='update';values=row;return q},delete:()=>{action='delete';return q},upsert:(row,opt)=>{action='upsert';values=row;conflict=opt?.onConflict||'id';return q},then:resolve=>{
     const state=window.testState;const db=state.db;db[table]||=[];let matched=db[table].filter(x=>filters.every(([k,v])=>x[k]===v));let data;
-    const make=row=>({id:crypto.randomUUID(),created_at:'2026-11-13T12:00:00Z',updated_at:'2026-11-13T12:00:00Z',status:table==='guest_music_requests'?'pending':table==='booking_inquiries'?'new':undefined,state:table==='equipment_reservations'?'reserved':undefined,run_state:table==='schedule_items'?'pending':undefined,is_open:true,token:table==='event_form_links'?(row.kind==='music'?'${musicToken}':'${inquiryToken}'):undefined,...row});
-    if(action==='insert'){data=make(values);db[table].push(data)}
+    const make=row=>({id:crypto.randomUUID(),created_at:'2026-11-13T12:00:00Z',updated_at:'2026-11-13T12:00:00Z',status:table==='guest_music_requests'?'pending':table==='booking_inquiries'?'new':undefined,state:table==='equipment_reservations'?'reserved':undefined,run_state:table==='schedule_items'?'pending':undefined,is_open:true,token:table==='event_form_links'?(row.kind==='music'?'${musicToken}':row.kind==='feedback'?'10000000-0000-4000-8000-000000000003':'${inquiryToken}'):undefined,...row});
+    if(action==='insert'){if(Array.isArray(values)){data=values.map(make);db[table].push(...data)}else{data=make(values);db[table].push(data)}}
     else if(action==='upsert'){let existing=db[table].find(x=>x[conflict]===values[conflict]);if(existing){Object.assign(existing,values);data=existing}else{data=make(values);db[table].push(data)}}
-    else if(action==='update'){matched.forEach(x=>Object.assign(x,values));data=matched}
+    else if(action==='update'){matched.forEach(x=>Object.assign(x,values));if(table==='guest_music_requests'&&values.status==='accepted')matched.forEach(x=>{if(!db.project_tracks.some(t=>t.project_id===x.project_id&&t.kind==='must_play'&&t.title===x.title&&t.artist===x.artist))db.project_tracks.push({id:crypto.randomUUID(),project_id:x.project_id,kind:'must_play',title:x.title,artist:x.artist,note:null});});data=matched}
     else if(action==='delete'){db[table]=db[table].filter(x=>!matched.includes(x));data=matched}
     else data=matched;
     if(range&&action==='select'&&Array.isArray(data))data=data.slice(range[0],range[1]+1);
@@ -28,8 +28,13 @@ window.supabase={createClient:()=>({
  },
  rpc:async(name,args)=>{
   const s=window.testState;const db=s.db;
-  if(name==='get_event_form'){const f=db.event_form_links.find(x=>x.token===args.form_token);return {data:f?{kind:f.kind,is_open:f.is_open,title:f.kind==='music'?'Mariage test':'Demande de prestation DJ'}:null,error:null}}
-  if(name==='submit_event_form'){const f=db.event_form_links.find(x=>x.token===args.form_token);if(!f?.is_open)return {data:null,error:{message:'Formulaire fermé'}};s.submissions.push(args);db[f.kind==='music'?'guest_music_requests':'booking_inquiries'].push({id:crypto.randomUUID(),project_id:f.project_id,status:f.kind==='music'?'pending':'new',created_at:'2026-11-13T12:00:00Z',...args.fields});return {data:crypto.randomUUID(),error:null}}
+  const assignVenue=(pid,vid)=>{const p=db.projects.find(x=>x.id===pid);if(!vid){db.project_venues=db.project_venues.filter(x=>x.project_id!==pid);p.location=null;return}const v=db.venues.find(x=>x.id===vid);let link=db.project_venues.find(x=>x.project_id===pid);if(!link){link={id:crypto.randomUUID(),project_id:pid};db.project_venues.push(link)}link.venue_id=vid;p.location=[v.name,v.address].filter(Boolean).join(', ')};
+  if(name==='set_project_directory_venue'){assignVenue(args.target_project,args.selected_venue);return {data:null,error:null}}
+  if(name==='save_catalog_project'){Object.assign(db.projects.find(x=>x.id===args.target_project),args.details);if(args.venue_choice!=='keep')assignVenue(args.target_project,args.venue_choice);return {data:null,error:null}}
+  if(name==='create_catalog_project'){const id=crypto.randomUUID();db.projects.push({id,...args.details,status:'nouveau',location:null});if(args.details.venue_id)assignVenue(id,args.details.venue_id);return {data:id,error:null}}
+  if(name==='delete_unused_client'){if(db.projects.some(p=>p.client_id===args.target_client))return {data:null,error:{message:'Ce client possède des projets'}};db.profiles=db.profiles.filter(x=>x.id!==args.target_client);return {data:null,error:null}}
+  if(name==='get_event_form'){const f=db.event_form_links.find(x=>x.token===args.form_token);return {data:f?{kind:f.kind,is_open:f.is_open,title:f.kind==='music'||f.kind==='feedback'?'Mariage test':'Demande de prestation DJ'}:null,error:null}}
+  if(name==='submit_event_form'){const f=db.event_form_links.find(x=>x.token===args.form_token);if(!f?.is_open)return {data:null,error:{message:'Formulaire fermé'}};s.submissions.push(args);(db[f.kind==='music'?'guest_music_requests':f.kind==='feedback'?'event_feedback':'booking_inquiries']||=[]).push({id:crypto.randomUUID(),project_id:f.project_id,status:f.kind==='music'?'pending':'new',created_at:'2026-11-13T12:00:00Z',message:args.fields.comment,...args.fields});return {data:crypto.randomUUID(),error:null}}
   if(name==='set_conductor_step'){const item=db.schedule_items.find(x=>x.id===args.step_id);if(args.next_state==='current')db.schedule_items.filter(x=>x.project_id===item.project_id).forEach(x=>x.run_state='pending');item.run_state=args.next_state;return {data:null,error:null}}
   if(name==='convert_booking_inquiry'){const inquiry=db.booking_inquiries.find(x=>x.id===args.inquiry_id);inquiry.project_id||=crypto.randomUUID();inquiry.status='won';if(!db.projects.some(p=>p.id===inquiry.project_id))db.projects.push({id:inquiry.project_id,title:args.project_title,status:'nouveau',client_id:args.target_client});return {data:inquiry.project_id,error:null}}
   return {data:null,error:null};
@@ -146,7 +151,10 @@ window.supabase={createClient:()=>({
     await page.locator('#venue-link-form select').selectOption({ label: 'Domaine test' });
     await page.locator('#venue-link-form button').click();
     await page.getByRole('heading', { name: 'Domaine test' }).waitFor();
-    assert.equal(await page.evaluate(() => window.testState.db.projects[0].location), 'Lyon');
+    assert.equal(
+      await page.evaluate(() => window.testState.db.projects[0].location),
+      'Domaine test'
+    );
     // Conductor reuses schedule_items; live state and extra instructions persist.
     await tool('conductor');
     form = await editor();

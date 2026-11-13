@@ -35,7 +35,7 @@ const EventTools = (() => {
   const projectUrl = (id) => `#/${admin() ? 'admin/projets' : 'projets'}/${id}`;
   const toolsUrl = (id, section) => `#/outils/${encodeURIComponent(id)}?section=${section}`;
   const publicUrl = (kind, token) =>
-    `${location.origin}${location.pathname}#/${kind === 'music' ? 'invites' : 'demande'}/${token}`;
+    `${location.origin}${location.pathname}#/${kind === 'music' ? 'invites' : kind === 'feedback' ? 'avis' : 'demande'}/${token}`;
   const projectOptions = (projects) =>
     Object.fromEntries(projects.map((p) => [p.id, p.title + (p.archived_at ? ' · Archivé' : '')]));
   const guestFields = [
@@ -110,9 +110,12 @@ const EventTools = (() => {
       event.preventDefault();
       const buttons = $$('button', form);
       buttons.forEach((b) => (b.disabled = true));
+      const draft = Drafts.begin(form);
       try {
         await callback(form);
+        Drafts.finish(draft, true);
       } catch (error) {
+        Drafts.finish(draft, false);
         ERR(error);
       } finally {
         buttons.forEach((b) => (b.disabled = false));
@@ -210,6 +213,7 @@ const EventTools = (() => {
       await after();
     });
     $('#editor-reset').onclick = () => {
+      Drafts.clear(form);
       form.reset();
       form.elements.record_id.value = '';
     };
@@ -255,7 +259,7 @@ const EventTools = (() => {
   }
   function linkCard(link) {
     const url = publicUrl(link.kind, link.token);
-    return `<article class="card form-link"><div class="actions"><strong>${link.is_open ? 'Formulaire ouvert' : 'Formulaire fermé'}</strong><span class="muted">${fmtDateTime(link.created_at)}</span></div><div class="share-actions"><input readonly value="${esc(url)}" aria-label="Lien du formulaire"><button class="btn small" data-copy-form="${link.token}">Copier</button><button class="btn small" data-qr="${link.token}">QR code</button><button class="btn small" data-close-form="${link.token}" data-open="${link.is_open ? 'false' : 'true'}">${link.is_open ? 'Fermer' : 'Rouvrir'}</button></div><div class="qr-preview hidden" id="qr-${link.token}"></div></article>`;
+    return `<article class="card form-link"><div class="actions"><strong>${link.is_open ? 'Formulaire ouvert' : 'Formulaire fermé'}</strong><span class="muted">${fmtDateTime(link.created_at)}</span></div><div class="share-actions"><input readonly value="${esc(url)}" aria-label="Lien du formulaire"><button class="btn small" data-copy-form="${link.token}">Copier</button><button class="btn small" data-qr="${link.token}">QR code</button><button class="btn small" data-download-qr="${link.token}">Télécharger le QR en PNG</button><button class="btn small" data-close-form="${link.token}" data-open="${link.is_open ? 'false' : 'true'}">${link.is_open ? 'Fermer' : 'Rouvrir'}</button></div><div class="qr-preview hidden" id="qr-${link.token}"></div></article>`;
   }
   function bindLinks(links, reload) {
     handle('[data-copy-form]', (button) =>
@@ -275,10 +279,14 @@ const EventTools = (() => {
         qr.addData(publicUrl(link.kind, token));
         qr.make();
         target.innerHTML =
-          qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true }) +
+          qr.createSvgTag({ cellSize: 4, margin: 16, scalable: true }) +
           `<p>Scanner pour ouvrir le formulaire</p>`;
       }
       target.classList.toggle('hidden');
+    });
+    handle('[data-download-qr]', async (button) => {
+      const link = links.find((x) => x.token === button.dataset.downloadQr);
+      await Enhancements.downloadQR(publicUrl(link.kind, link.token), `${link.kind}-qr-code.png`);
     });
     handle('[data-close-form]', async (button) => {
       await write(
@@ -332,10 +340,12 @@ const EventTools = (() => {
         extra: `<div class="tool-metrics">${mini('Invités', items.length)}${mini(
           'Présents confirmés',
           items.filter((x) => x.response === 'confirmed').reduce((n, x) => n + 1 + x.companions, 0)
-        )}${mini('En attente', items.filter((x) => x.response === 'pending').length)}</div><div class="tool-toolbar"><input id="guest-search" type="search" placeholder="Rechercher un invité, une table…" aria-label="Rechercher un invité"><button class="btn" id="export-guests">Exporter CSV</button></div>${note('Les allergies et coordonnées restent dans l’espace connecté du projet. Elles ne sont pas exposées par les liens publics.')}`,
+        )}${mini('En attente', items.filter((x) => x.response === 'pending').length)}</div><div class="tool-toolbar"><input id="guest-search" type="search" placeholder="Rechercher un invité, une table…" aria-label="Rechercher un invité"><button class="btn" id="export-guests">Exporter CSV</button><button class="btn" id="print-guests">Imprimer la liste</button></div>${note('Les allergies et coordonnées restent dans l’espace connecté du projet. Elles ne sont pas exposées par les liens publics.')}`,
         render: (x) =>
           `<strong>${esc(x.full_name)}</strong><span class="status">${ST[x.response]}</span><p>${x.companions} accompagnant(s)${x.table_name ? ' · ' + esc(x.table_name) : ''}</p>${contactLines(x)}${x.dietary ? `<p class="warn-text">Besoins : ${esc(x.dietary)}</p>` : ''}<p class="pre">${esc(x.notes)}</p>`,
       });
+      $('#print-guests').onclick = () => Enhancements.printGuests(p, items);
+      Enhancements.mountGuestBulk(p, items, reload, editable);
       $('#export-guests').onclick = () =>
         csv(
           'invites.csv',
@@ -534,7 +544,7 @@ const EventTools = (() => {
       );
     };
     $('#tool-content').innerHTML =
-      `<div class="tool-toolbar"><h2>Matériel à utiliser pour ce projet</h2><a class="btn" href="#/materiel">Mon matériel</a><button class="btn" id="export-packing">Exporter la checklist</button></div>
+      `<div class="tool-toolbar"><h2>Matériel à utiliser pour ce projet</h2><a class="btn" href="#/materiel">Mon matériel</a><button class="btn" id="export-packing">Exporter la checklist</button><button class="btn" id="print-packing">Imprimer les cases à cocher</button></div>
       ${note('Choisissez les éléments de votre propre inventaire et les quantités à emporter. Cochez chaque ligne une fois le matériel prêt.')}
       <div class="tool-metrics">${mini('Éléments choisis', selected.length)}${mini('Prêts à emporter', selected.filter((item) => item.state === 'loaded').length)}${mini('À préparer', selected.filter((item) => item.state !== 'loaded').length)}</div>
       <section class="card"><form id="gear-selection-form" class="stack"><div class="row-2">${fieldsHTML(fields)}</div><button class="btn primary" ${available.length ? '' : 'disabled'}>Ajouter au projet</button></form>
@@ -568,15 +578,13 @@ const EventTools = (() => {
             .update({ quantity: values.quantity, state: 'reserved' })
             .eq('id', previous.id)
             .eq('project_id', p.id)
-        : sb
-            .from('equipment_reservations')
-            .insert({
-              ...values,
-              project_id: p.id,
-              starts_on: p.event_date || today(),
-              ends_on: p.event_date || today(),
-              state: 'reserved',
-            });
+        : sb.from('equipment_reservations').insert({
+            ...values,
+            project_id: p.id,
+            starts_on: p.event_date || today(),
+            ends_on: p.event_date || today(),
+            state: 'reserved',
+          });
       await write(query.select('id').single(), 'Matériel ajouté au projet');
       await reload();
     });
@@ -630,6 +638,16 @@ const EventTools = (() => {
       );
       await reload();
     });
+    $('#print-packing').onclick = () =>
+      Enhancements.printList(
+        p,
+        'Matériel à emporter',
+        ['Matériel', 'Quantité'],
+        selected.map((item) => [
+          stock.find((gear) => gear.id === item.equipment_id)?.name,
+          item.quantity,
+        ])
+      );
     $('#export-packing').onclick = () =>
       csv(
         'materiel-projet.csv',
@@ -760,7 +778,7 @@ const EventTools = (() => {
     ]);
     const venue = venues.find((x) => x.id === links[0]?.venue_id);
     $('#tool-content').innerHTML =
-      `<div class="tool-toolbar"><h2>Fiche technique du lieu</h2><a class="btn" href="#/lieux">Répertoire des lieux</a></div><section class="card"><form id="venue-link-form" class="stack"><label>Lieu associé<select name="venue_id" required><option value="">Choisir un lieu</option>${optionList(Object.fromEntries(venues.map((x) => [x.id, x.name])), venue?.id)}</select></label><button class="btn primary" ${venues.length ? '' : 'disabled'}>Associer au projet</button></form>${note('L’association ne remplace pas l’adresse déjà enregistrée sur le projet.')}</section>${
+      `<div class="tool-toolbar"><h2>Fiche technique du lieu</h2><a class="btn" href="#/lieux">Répertoire des lieux</a></div><section class="card"><form id="venue-link-form" class="stack"><label>Lieu associé<select name="venue_id" required><option value="">Choisir un lieu</option>${optionList(Object.fromEntries(venues.map((x) => [x.id, x.name])), venue?.id)}</select></label><button class="btn primary" ${venues.length ? '' : 'disabled'}>Associer au projet</button></form>${note('Choisissez un lieu créé dans le répertoire. Il sera utilisé partout sur le projet et dans ses liens partagés.')}</section>${
         venue
           ? `<section class="card venue-detail"><h2>${esc(venue.name)}</h2><p>${esc(venue.address)}</p><p>${esc(venue.contact_name)} · ${esc(venue.phone)}</p>${[
               ['Accès', venue.access_notes],
@@ -774,15 +792,11 @@ const EventTools = (() => {
       }`;
     submit($('#venue-link-form'), async (form) => {
       await write(
-        sb
-          .from('project_venues')
-          .upsert(
-            { project_id: p.id, venue_id: new FormData(form).get('venue_id') },
-            { onConflict: 'project_id' }
-          )
-          .select('id')
-          .single(),
-        'Lieu associé'
+        sb.rpc('set_project_directory_venue', {
+          target_project: p.id,
+          selected_venue: new FormData(form).get('venue_id'),
+        }),
+        'Lieu associé au projet'
       );
       await reload();
     });
@@ -802,6 +816,7 @@ const EventTools = (() => {
     ];
     $('#tool-content').innerHTML =
       `${note('Bilan interne réservé à l’administrateur. Il n’est jamais exposé dans les vues publiques ou l’espace client.')}<section class="card"><h2>Bilan après événement</h2><form id="debrief-form" class="stack"><div class="row-2">${fieldsHTML(fields, current)}</div><button class="btn primary">Enregistrer le bilan</button></form>${current.updated_at ? `<p class="muted">Dernière modification : ${fmtDateTime(current.updated_at)}</p>` : ''}</section>`;
+    await feedbackPanel(p, reload);
     submit($('#debrief-form'), async (form) => {
       const values = valuesOf(form, fields);
       values.rating = values.rating ? Number(values.rating) : null;
@@ -818,6 +833,32 @@ const EventTools = (() => {
       );
       await reload();
     });
+  }
+
+  async function feedbackPanel(p, reload) {
+    const [links, feedback] = await Promise.all([
+      rows('event_form_links', { project_id: p.id, kind: 'feedback' }),
+      rows('event_feedback', { project_id: p.id }),
+    ]);
+    const average = feedback.length
+      ? (feedback.reduce((sum, x) => sum + x.rating, 0) / feedback.length).toFixed(1)
+      : '—';
+    $('#tool-content').insertAdjacentHTML(
+      'beforeend',
+      `<section class="feedback-panel"><div class="tool-toolbar"><h2>Avis des clients et invités</h2><button id="create-feedback-link" class="btn primary">Créer un lien de retour</button></div><div class="tool-metrics">${mini('Avis reçus', feedback.length)}${mini('Note moyenne / 5', average)}</div><div class="tool-list">${links.map(linkCard).join('')}</div><div class="tool-list">${feedback.map((x) => `<article class="card"><strong>${'★'.repeat(x.rating)}${'☆'.repeat(5 - x.rating)} · ${x.rating}/5</strong><p class="muted">${esc(x.respondent || 'Anonyme')} · ${x.audience === 'client' ? 'Client / organisateur' : 'Invité'} · ${fmtDateTime(x.created_at)}</p><p class="pre">${esc(x.message)}</p></article>`).join('') || empty('Aucun avis reçu.')}</div></section>`
+    );
+    handle('#create-feedback-link', async () => {
+      await write(
+        sb
+          .from('event_form_links')
+          .insert({ kind: 'feedback', project_id: p.id })
+          .select('id')
+          .single(),
+        'Lien de retour créé'
+      );
+      await reload();
+    });
+    bindLinks(links, reload);
   }
 
   async function inventory() {
@@ -1123,6 +1164,7 @@ const EventTools = (() => {
         '<section class="card public-form"><h1>Formulaire fermé</h1><p>Les nouvelles demandes ne sont plus acceptées.</p></section>';
       return;
     }
+    if (form.kind === 'feedback') return Enhancements.feedbackForm(token, form);
     const fields =
       form.kind === 'music'
         ? [
@@ -1203,5 +1245,5 @@ const EventTools = (() => {
         : []),
     ];
   }
-  return { pages, publicForm, shortcuts, navLinks };
+  return { pages, publicForm, shortcuts, navLinks, getVenues: () => rows('venues', {}, 'name') };
 })();

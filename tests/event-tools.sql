@@ -51,7 +51,7 @@ begin
   pid:=public.convert_booking_inquiry(current_setting('test.lead')::uuid,current_setting('test.client')::uuid,'Converted event');
   pid2:=public.convert_booking_inquiry(current_setting('test.lead')::uuid,current_setting('test.client')::uuid,'Duplicate event');
   if pid<>pid2 or (select count(*) from public.projects where id=pid)<>1 then raise exception 'Lead conversion not idempotent';end if;
-  if not exists(select 1 from public.projects where id=pid and location='Venue' and event_date='2030-02-01') then raise exception 'Conversion lost lead fields';end if;
+  if not exists(select 1 from public.projects where id=pid and location is null and description like '%Venue%' and event_date='2030-02-01') then raise exception 'Conversion lost lead fields';end if;
   if (select count(*) from storage.objects where bucket_id='project-documents' and name like p::text||'/%')<>2 then raise exception 'Admin storage read failed';end if;
 end $$;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.client'),'role','authenticated')::text,true);

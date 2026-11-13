@@ -7,7 +7,7 @@ const mock = `
 window.testState = { admin: false, shares: [], calls: [], projects: [{id:'${projectId}',title:'Project',status:'nouveau',archived_at:null,client:{}}], payload: {title: '<script>unsafe</script>', must_play: [{title:'Shared song', artist:'Artist', url:'javascript:alert(1)'}]} };
 window.supabase = {createClient: () => ({
   auth: {getSession: async () => ({data:{session: window.testState.admin ? {user:{id:'admin'}} : null}}), onAuthStateChange: () => {}, signOut: async () => {}},
-  rpc: async (name,args) => {window.testState.calls.push({name,args}); return {data:window.testState.payload,error:null}},
+  rpc: async (name,args) => {window.testState.calls.push({name,args}); if(name==='save_catalog_project'){Object.assign(window.testState.projects.find(p=>p.id===args.target_project),args.details);return {data:null,error:null}}return {data:window.testState.payload,error:null}},
   from: table => {
     let action='select', values, filter, single=false;
     const q = {
