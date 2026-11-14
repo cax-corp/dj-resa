@@ -93,7 +93,7 @@ Depuis les raccourcis de chaque fiche projet :
 
 - **Invités** : confirmations, accompagnants, groupes/tables, allergies, recherche et export CSV.
 - **Demandes musicales** : formulaire invité sans connexion, lien et QR code généré localement, modération et fermeture/réouverture des demandes.
-- **Conducteur** : planning existant enrichi avec intervenants, morceaux, consignes et états de séquence. Mode direct et impression.
+- **Planning** : planning existant enrichi avec intervenants, morceaux, consignes et états de séquence. Mode direct et impression.
 - **Contacts** : prestataires et intervenants, coordonnées et consignes du projet.
 - **Documents** : dépôt privé, ouverture native dans le navigateur, téléchargement séparé, visibilité client explicite et liens de lecture révocables. Taille maximale : 20 Mo. Les données déjà téléchargées ne peuvent pas être retirées du destinataire ; masquer au client ne révoque pas un lien de lecture : utiliser son bouton de révocation.
 - **Matériel** : choix dans son propre inventaire, quantités à emporter, checklist « Prêt à emporter » et export CSV. Aucune période de réservation ni retour à saisir. Le même matériel peut être prévu sur plusieurs projets ; une alerte informe s’ils ont lieu le même jour.
@@ -165,3 +165,11 @@ La présentation conserve les thèmes sobres clair et sombre avec des textes plu
 `interface.js` anime brièvement l'apparition des grands blocs, sans observer la saisie dans les tableaux ni modifier les formulaires. Les boutons et raccourcis ont des retours visuels, et une barre indique le chargement d'une page. La préférence système de réduction des mouvements désactive les animations, y compris lorsqu'elle change pendant l'utilisation. Les impressions restent sans navigation ni animations.
 
 `node tests/interface.cjs` vérifie les thèmes et tailles de 360 à 1 440 pixels, le menu au clavier, la navigation fixe, les mouvements réduits, le chargement et le contraste du texte. Les suites existantes couvrent toujours projets, invités, documents, formulaires et impressions. Aucun changement de données ni migration.
+
+## Heures de travail du planning
+
+L'outil **Conducteur** est renommé **Planning**. Ses adresses historiques `?section=conductor` restent valides. Chaque créneau affiche sa durée et le planning affiche les heures de travail planifiées. Le même calcul est repris dans **Tarification et facturation**, dans la fiche du projet, ainsi que dans son planning de préparation.
+
+Le total utilise les débuts et fins existants à la minute près. Les pauses entre créneaux sont exclues ; les chevauchements ne comptent qu'une fois. Une fin avant le début est interprétée le lendemain, sur une journée de prestation (24 heures au maximum). Les créneaux sans horaires complets ou avec des heures identiques sont signalés et exclus, jusqu'à correction. Ce total représente le temps planifié, pas un chronométrage du travail effectué.
+
+Aucune migration ni réécriture des projets : les tarifs, paiements, factures et liens existants restent inchangés. `work-hours.js` partage le calcul entre les vues ; `node tests/work-hours.cjs` contrôle les durées, minuit, chevauchements, pauses, horaires incomplets, édition/suppression, total financier et conservation des montants.

@@ -308,7 +308,7 @@ const EventTools = (() => {
     const sections = {
       guests: 'Invités',
       requests: 'Demandes musicales',
-      conductor: 'Conducteur',
+      conductor: 'Planning',
       contacts: 'Contacts',
       documents: 'Documents',
       equipment: 'Matériel',
@@ -462,9 +462,9 @@ const EventTools = (() => {
       fixed: { project_id: p.id },
       canEdit: editable,
       after: reload,
-      extra: `<div class="tool-toolbar"><h2>Conducteur de l’événement</h2><button class="btn" id="live-mode">Mode direct</button><button class="btn" id="print-conductor">Imprimer</button></div>${note('Ce conducteur utilise le planning du projet. Vos créneaux existants sont conservés. Une seule séquence peut être marquée en cours à la fois.')}`,
+      extra: `<div class="tool-toolbar"><h2>Planning de l’événement</h2><button class="btn" id="live-mode">Mode direct</button><button class="btn" id="print-conductor">Imprimer</button></div>${note('Renseignez le début et la fin de chaque créneau pour calculer les heures de travail. Une seule séquence peut être marquée en cours à la fois.')}${WorkHours.render(items)}`,
       render: (x) =>
-        `<div class="conductor-step ${x.run_state === 'current' ? 'is-current' : ''}"><div class="conductor-time">${hm(x.start_time)}${x.end_time ? ' – ' + hm(x.end_time) : ''}</div><strong>${esc(x.title)}</strong><span class="status">${{ pending: 'À venir', current: 'En cours', done: 'Terminé' }[x.run_state || 'pending']}</span><p>${esc(x.speaker)}${x.song ? ' · ♫ ' + esc(x.song) : ''}</p><p class="pre">${esc(x.details)}</p>${x.cue ? `<p class="conductor-cue">${esc(x.cue)}</p>` : ''}${editable ? `<div class="actions no-print"><button class="btn small" data-step="${x.id}" data-state="current">Lancer</button><button class="btn small" data-step="${x.id}" data-state="done">Terminer</button><button class="btn small" data-step="${x.id}" data-state="pending">Réinitialiser</button></div>` : ''}</div>`,
+        `<div class="conductor-step ${x.run_state === 'current' ? 'is-current' : ''}"><div class="conductor-time">${hm(x.start_time)}${x.end_time ? ' – ' + hm(x.end_time) : ''}</div><p class="work-duration">${WorkHours.duration(x) === null ? 'Durée à compléter' : WorkHours.format(WorkHours.duration(x))}${x.end_time && x.end_time < x.start_time ? ' · fin le lendemain' : ''}</p><strong>${esc(x.title)}</strong><span class="status">${{ pending: 'À venir', current: 'En cours', done: 'Terminé' }[x.run_state || 'pending']}</span><p>${esc(x.speaker)}${x.song ? ' · ♫ ' + esc(x.song) : ''}</p><p class="pre">${esc(x.details)}</p>${x.cue ? `<p class="conductor-cue">${esc(x.cue)}</p>` : ''}${editable ? `<div class="actions no-print"><button class="btn small" data-step="${x.id}" data-state="current">Lancer</button><button class="btn small" data-step="${x.id}" data-state="done">Terminer</button><button class="btn small" data-step="${x.id}" data-state="pending">Réinitialiser</button></div>` : ''}</div>`,
     });
     // Optional end time must be SQL NULL, not an empty time literal.
     const form = $('#tool-editor-form');
@@ -489,7 +489,7 @@ const EventTools = (() => {
           step_id: button.dataset.step,
           next_state: button.dataset.state,
         }),
-        'Conducteur mis à jour'
+        'Planning mis à jour'
       );
       await reload();
     });
@@ -1082,7 +1082,7 @@ const EventTools = (() => {
         }
       ).join(
         ''
-      )}</div></section>${note('Les alertes signalent plusieurs prestations le même jour ou une date bloquée. Les horaires précis restent à vérifier dans les conducteurs des projets.')}${
+      )}</div></section>${note('Les alertes signalent plusieurs prestations le même jour ou une date bloquée. Les horaires précis restent à vérifier dans les plannings des projets.')}${
         projects.some((p) => !p.event_date && !p.archived_at)
           ? `<section class="card"><h2>Dates à définir</h2>${projects
               .filter((p) => !p.event_date && !p.archived_at)
@@ -1244,7 +1244,7 @@ const EventTools = (() => {
   function shortcuts(id) {
     return `<section class="project-tool-shortcuts no-print" aria-label="Outils de l’événement">${[
       ['guests', 'Invités'],
-      ['conductor', 'Conducteur'],
+      ['conductor', 'Planning'],
       ['contacts', 'Prestataires'],
       ['documents', 'Documents'],
       ...(admin()

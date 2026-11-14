@@ -727,7 +727,8 @@ function scheduleBlock(items, canEdit) {
     .map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
   return `
   <section class="card extras-full">
-    <h2>Planning de la soirée</h2>
+    <h2>Planning</h2>
+    ${WorkHours.render(items)}
     <ol class="timeline">
       ${items.map(s => `
         <li class="tl-item">
@@ -962,7 +963,8 @@ async function renderProject(id, isAdmin) {
       <div class="grid two">${trackPanel('must_play', 'À passer absolument', must, canEdit)}${trackPanel('do_not_play', 'À ne pas passer', avoid, canEdit)}</div>
     </div>
     <div id="project-finance" class="project-section">
-      <div class="section-heading"><p class="eyebrow">Gestion</p><h2>Tarifs, règlements et factures</h2></div>
+      <div class="section-heading"><p class="eyebrow">Gestion</p><h2>Tarification et facturation</h2></div>
+      <section class="card finance-work-hours"><h3>Total des heures du planning</h3>${WorkHours.render(sc.data)}<a class="btn small no-print" href="#/outils/${id}?section=conductor">Ouvrir le planning</a></section>
       <div class="extras">${isAdmin ? tariffBlock(base, rp.data) : ''}${paymentsBlock(pa.data, isAdmin)}${invoicesBlock(iv.data, isAdmin)}</div>
     </div>
     ${isAdmin ? sharingBlock() : ''}`;

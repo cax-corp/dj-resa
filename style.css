@@ -1276,3 +1276,15 @@ body.is-loading .route-progress { display: block; }
     .tool-tabs { position: static; box-shadow: none; }
     body { background: #fff; }
 }
+
+/* Shared planning and billing work-hour totals. */
+.work-hours-summary { display: flex; gap: 28px; align-items: center; padding: 20px; margin: 18px 0 24px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; }
+.work-hours-summary > div:first-child { flex: 0 0 auto; min-width: 180px; }
+.work-hours-label { display: block; font-size: 13px; color: var(--text-light); }
+.work-hours-summary strong { display: block; font-size: 30px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.work-hours-summary p { font-size: 13px; margin: 4px 0; }
+.work-duration { font-size: 13px; color: var(--text-light); margin: 0 0 12px !important; }
+.finance-work-hours { margin-bottom: 22px; }
+.finance-work-hours .work-hours-summary { margin: 16px 0; }
+@media (max-width: 768px) { .work-hours-summary { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; } }
+@media print { .work-hours-summary { break-inside: avoid; background: #fff; color: #000; } }
