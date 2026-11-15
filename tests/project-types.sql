@@ -1,0 +1,30 @@
+begin;
+select set_config('test.admin',(select id::text from public.profiles where role='admin' limit 1),true);
+select set_config('test.client',(select id::text from public.profiles where role='client' limit 1),true);
+set local role authenticated;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.admin'),'role','authenticated')::text,true);
+do $$ declare p uuid; legacy uuid; rate uuid; rejected boolean:=false; begin
+ p:=public.create_catalog_project(jsonb_build_object('client_id',current_setting('test.client'),'title','Future wedding test','event_type','mariage'));
+ perform set_config('test.project',p::text,true);
+ if not exists(select 1 from public.projects where id=p and event_type='mariage' and event_date is null) then raise exception 'Unknown-date wedding creation failed';end if;
+ perform public.save_catalog_project(p,'{"title":"Future wedding test","status":"nouveau","description":"Preparation"}','keep');
+ if (select event_type from public.projects where id=p)<>'mariage' then raise exception 'Legacy save erased type';end if;
+ perform public.save_catalog_project(p,'{"title":"Updated project","status":"nouveau","event_type":"anniversaire"}','keep');
+ if (select event_type from public.projects where id=p)<>'anniversaire' then raise exception 'Type update failed';end if;
+ legacy:=public.create_catalog_project(jsonb_build_object('client_id',current_setting('test.client'),'title','Legacy payload test'));
+ if (select event_type from public.projects where id=legacy) is not null then raise exception 'Legacy payload misclassified';end if;
+ begin perform public.create_catalog_project(jsonb_build_object('client_id',current_setting('test.client'),'title','Invalid test','event_type','invalid'));exception when check_violation then rejected:=true;end;
+ if not rejected then raise exception 'Invalid type accepted';end if;
+ insert into public.rate_plans(name,amount,unit,event_type) values('Wedding test rate',25,'heure','mariage') returning id into rate;
+ perform set_config('test.rate',rate::text,true);
+end $$;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.client'),'role','authenticated')::text,true);
+do $$ declare n integer; rejected boolean:=false; begin
+ if not exists(select 1 from public.projects where id=current_setting('test.project')::uuid and event_type='anniversaire') then raise exception 'Client cannot see own type';end if;
+ update public.rate_plans set amount=0 where id=current_setting('test.rate')::uuid;
+ get diagnostics n=row_count;if n<>0 then raise exception 'Client changed catalog';end if;
+ begin perform public.create_catalog_project(jsonb_build_object('client_id',current_setting('test.client'),'title','Unauthorized','event_type','mariage'));exception when insufficient_privilege then rejected:=true;end;
+ if not rejected then raise exception 'Client created project through admin RPC';end if;
+end $$;
+reset role;
+rollback;

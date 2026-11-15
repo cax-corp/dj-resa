@@ -195,3 +195,15 @@ Les critères renseignés apparaissent dans les avis du Bilan, en plus de la moy
 La migration `add_optional_feedback_criteria` est dans `db/feedback-criteria.sql`. Elle ajoute quatre notes facultatives bornées de 1 à 5, rend le rôle historique facultatif et conserve les limites d'envoi, la fermeture des formulaires et les droits existants. La migration contrôle la conservation des avis et liens existants. Appliquer le script avant la publication sur une autre base.
 
 Validation : `tests/feedback-criteria.sql` contrôle en transaction annulée l'enregistrement anonyme, les critères facultatifs, les bornes, l'ancienne forme du message, les permissions et un lien fermé ; `node tests/feedback-criteria.cjs` contrôle le parcours public, les noms facultatifs, les questions, le bilan et le mobile.
+
+## Types de prestation et tarifs associés
+
+La création d'un projet demande un type : mariage, anniversaire, événement d'entreprise, événement associatif, soirée privée ou autre prestation. La date reste facultative pour les événements en préparation lointaine. Le type est modifiable sur la fiche et visible dans les listes et l'espace client. Les anciens projets restent « Type à définir » jusqu'à leur modification explicite. Les anciens liens publics conservent leurs rubriques : ce nouveau champ n'y est pas ajouté automatiquement.
+
+**Mon compte → Grille tarifaire par prestation** présente chaque catégorie et ses montants. Un tarif peut être général ou associé à un type ; les projets proposent uniquement les tarifs correspondants et les tarifs généraux. La modification du type ou du catalogue ne réécrit pas un montant déjà appliqué. L'application d'un tarif reste un bouton explicite.
+
+La grille de départ reprend les prix déjà utilisés : 25 €/h en base, 35 €/h en heures tardives. Chaque type a ses propres lignes et descriptions modifiables. Le forfait Famille & amis de 150 € reste général et inchangé. Il s'agit de bases de devis, sans prix de marché supposé ni majoration automatique pour 2027/2028. Le devis se construit selon les tâches et horaires prévus. Le bouton **Reprendre les heures du planning** remplit la quantité d'un tarif horaire ; ajuster cette quantité aux heures réellement couvertes, notamment pour les heures tardives, puis appliquer le tarif.
+
+La migration `add_project_types_and_scoped_rates` est dans `db/project-types.sql`. Elle ajoute deux colonnes facultatives avec contrôle des types et adapte les fonctions de création/modification sans changer leurs droits. Les anciennes requêtes sans type restent compatibles. `db/project-type-starter-rates.sql` est un ajout de données idempotent : il copie les bases horaires générales Normal/Tard dans les six catégories, sans modifier les tarifs généraux, projets, paiements ou factures. Les installations sans ces bases ne reçoivent aucun montant inventé.
+
+Validation : `tests/project-types.sql` pour les droits, types invalides, requêtes historiques et mariage sans date, dans une transaction annulée ; `node tests/project-types.cjs` pour les formulaires, propositions tarifaires, heures, édition de la grille, conservation des montants et affichage mobile.

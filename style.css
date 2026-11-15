@@ -1309,3 +1309,22 @@ body.is-loading .route-progress { display: block; }
 .feedback-scores dt { color: var(--text-light); }
 .feedback-scores dd { font-weight: 600; font-variant-numeric: tabular-nums; }
 @media(max-width:480px) { .feedback-form .rating-field { padding: 12px; } .feedback-form .rating-stars { gap: 3px; justify-content: space-between; } .feedback-scores { grid-template-columns: 1fr; } }
+
+/* Per-event pricing catalog. Existing amounts remain individual project snapshots. */
+.event-rate-overview { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin: 22px 0 30px; }
+.event-rate-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); }
+.event-rate-card h3 { font-size: 16px; }
+.event-rate-card p { font-size: 13px; }
+.event-rate-card .btn { margin-top: auto; }
+.rate-row { grid-template-columns: repeat(3,minmax(0,1fr)); align-items: end; gap: 16px; }
+.rate-row > label { min-width: 0; }
+.rate-row input, .rate-row select { min-width: 0; }
+.event-type-guidance { font-size: 13px; margin-top: -8px; }
+.project-type-label { display: inline-block; font-size: 11px; font-weight: 500; color: var(--text-light); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; margin: 4px 0 0 8px; }
+@media(max-width:1000px) { .event-rate-overview { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:600px) { .event-rate-overview, .rate-row { grid-template-columns: 1fr; } .project-type-label { margin-left: 0; } }
+
+.event-rate-prices { list-style: none; width: 100%; font-size: 12px; }
+.event-rate-prices li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.event-rate-prices strong { white-space: nowrap; }
+#rates-panel { scroll-margin-top: 84px; }

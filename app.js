@@ -226,13 +226,16 @@ const settingsBlock = (s) => `
 const rateOpts = (sel) => Object.entries(RATE_UNITS)
   .map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${l}</option>`).join('');
 
-const ratesBlock = (plans) => `
-  <section class="card" style="margin-top:25px">
-    <h2>Tarifs de base</h2>
+const ratesBlock = (plans, selectedType = '') => `
+  <section class="card" id="rates-panel" style="margin-top:25px">
+    <h2>Grille tarifaire par prestation</h2>
+    ${EventTypes.overview(plans)}
     <p class="muted hint">Créez vos tarifs ici. Vous pourrez les appliquer à chaque projet, puis ajuster le montant pour ce projet seulement.</p>
-    ${plans.map(r => `
+    <h3>${selectedType ? 'Tarifs ' + esc(EventTypes.label(selectedType)) + ' et tarifs généraux' : 'Tarifs généraux'}</h3>
+    ${(selectedType ? EventTypes.rates(plans,selectedType) : plans.filter(r=>!r.event_type)).map(r => `
       <form class="rate-row rate-edit" data-id="${r.id}">
         <label>Nom<input name="name" value="${esc(r.name)}" required></label>
+        <label>Type de prestation<select name="event_type">${EventTypes.options(r.event_type, 'Toutes les prestations')}</select></label>
         <label>Montant (€)<input name="amount" type="number" step="0.01" min="0" value="${r.amount}" required></label>
         <label>Unité<select name="unit">${rateOpts(r.unit)}</select></label>
         <label>Description<input name="description" value="${esc(r.description || '')}"></label>
@@ -242,7 +245,8 @@ const ratesBlock = (plans) => `
         </div>
       </form>`).join('') || '<p class="empty">Aucun tarif pour le moment.</p>'}
     <form id="rate-new" class="rate-row rate-new">
-      <label>Nom<input name="name" required placeholder="Ex. Tarif normal"></label>
+      <label>Nom<input name="name" required placeholder="${esc(EventTypes.suggestions[selectedType] || 'Ex. Tarif normal')}"></label>
+      <label>Type de prestation<select name="event_type">${EventTypes.options(selectedType, 'Toutes les prestations')}</select></label>
       <label>Montant (€)<input name="amount" type="number" step="0.01" min="0" required></label>
       <label>Unité<select name="unit">${rateOpts('forfait')}</select></label>
       <label>Description<input name="description" placeholder="Optionnel"></label>
@@ -292,7 +296,7 @@ async function renderAccount() {
         </form>
       </section>
     </div>
-    ${isAdmin ? settingsBlock(settings) + ratesBlock(plans) : ''}`;
+    ${isAdmin ? settingsBlock(settings) + ratesBlock(plans, parseHash().params.get('type') || '') : ''}`;
 
   $('#acc-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -317,6 +321,7 @@ async function renderAccount() {
   };
 
   if (!isAdmin) return;
+  if (EventTypes.labels[parseHash().params.get('type')]) requestAnimationFrame(()=>$('#rates-panel')?.scrollIntoView({block:'start'}));
 
   $('#settings-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -327,6 +332,7 @@ async function renderAccount() {
 
   const rateData = (f) => ({
     name: String(f.get('name')).trim(),
+    event_type: String(f.get('event_type') || '') || null,
     amount: Number(f.get('amount') || 0),
     unit: f.get('unit'),
     description: String(f.get('description') || '').trim() || null
@@ -361,7 +367,7 @@ function projectRow(p, isAdmin, unpaid = 0) {
   return `
   <a class="row-card project-row" href="#/${isAdmin ? 'admin/projets' : 'projets'}/${p.id}">
     <div class="project-name-cell"><span class="project-file-icon" aria-hidden="true">${navIcon('projects')}</span><div>
-      <strong>${esc(p.title)}</strong>
+      <strong>${esc(p.title)}</strong>${p.event_type ? `<span class="project-type-label">${esc(EventTypes.label(p.event_type))}</span>` : ''}
       <div class="muted">${isAdmin && p.client ? esc(p.client.full_name || p.client.email || 'Sans nom') : 'Événement'}</div>
       ${isAdmin && unpaid > 0 ? `<div class="warn-text">${fmtEur(unpaid)} à encaisser</div>` : ''}
     </div></div>
@@ -481,6 +487,8 @@ async function renderNewProject(preClient = '') {
               ${esc(c.full_name || 'Sans nom')} — ${esc(c.email || '')}</option>`).join('')}
           </select>
         </label>
+        <label>Type de prestation<select name="event_type" required>${EventTypes.options('', 'Choisir un type de prestation')}</select></label>
+        <p class="muted event-type-guidance" id="new-type-guidance">Choisissez le type d’événement. La date peut rester à définir.</p>
         <label>Nom du projet / événement<input name="title" required></label>
         <div class="row-2">
           <label>Date<input type="date" name="event_date"></label>
@@ -491,6 +499,11 @@ async function renderNewProject(preClient = '') {
       </form>
     </section>`;
 
+  const typeSelect = $('#new-project [name=event_type]');
+  typeSelect.onchange = () => {
+    const type = typeSelect.value;
+    $('#new-type-guidance').textContent = EventTypes.notes[type] || 'Choisissez le type d’événement. La date peut rester à définir.';
+  };
   $('#new-project').onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
@@ -509,6 +522,7 @@ function infoBlock(p, client, isAdmin, venues = [], venueId = '') {
     <section class="card">
       <h2>Mon projet</h2>
       <div class="info-list">
+        ${info('Type de prestation', esc(EventTypes.label(p.event_type)))}
         ${info('Date', p.event_date ? fmtDate(p.event_date) : 'À définir')}
         ${info('Lieu', esc(p.location || '—'))}
         ${info('Statut', `<span class="status ${STATUS_CLS[p.status]}">${STATUS[p.status]}</span>`)}
@@ -525,6 +539,7 @@ function infoBlock(p, client, isAdmin, venues = [], venueId = '') {
       <h2>Modifier le projet</h2>
       <form id="edit-form" class="stack">
         <label>Nom<input name="title" value="${esc(p.title)}" required></label>
+        <label>Type de prestation<select name="event_type">${EventTypes.options(p.event_type)}</select></label>
         <div class="row-2">
           <label>Date<input type="date" name="event_date" value="${p.event_date || ''}"></label>
           <label>Lieu du répertoire<select name="venue_id"><option value="">À définir</option>${!venueId && p.location ? `<option value="keep" selected>Lieu enregistré : ${esc(p.location)}</option>` : ''}${venues.map(v=>`<option value="${v.id}" ${v.id===venueId?'selected':''}>${esc(v.name)}${v.address?' · '+esc(v.address):''}</option>`).join('')}</select><a href="#/lieux">Créer un lieu dans le répertoire →</a></label>
@@ -785,14 +800,16 @@ function tasksBlock(tasks, canEdit) {
   </section>`;
 }
 
-function tariffBlock(base, plans) {
+function tariffBlock(base, plans, eventType) {
+  plans = EventTypes.rates(plans, eventType);
   const opts = plans.map(r =>
     `<option value="${r.id}" data-amount="${r.amount}" data-unit="${r.unit}" data-name="${esc(r.name)}">
-      ${esc(r.name)} — ${fmtEur(r.amount)}${r.unit === 'heure' ? ' / h' : ' (forfait)'}</option>`).join('');
+      ${esc(r.name)} — ${fmtEur(r.amount)}${r.unit === 'heure' ? ' / h' : ' (forfait)'} · ${r.event_type ? esc(EventTypes.label(r.event_type)) : 'Général'}</option>`).join('');
 
   return `
   <section class="card">
-    <h2>Tarif du projet</h2>
+    <h2>Tarif du projet${eventType ? ' · ' + esc(EventTypes.label(eventType)) : ''}</h2>
+    <p class="muted hint">${eventType ? 'Tarifs adaptés au type de prestation et tarifs généraux.' : 'Choisissez le type de prestation dans la fiche du projet pour retrouver les tarifs correspondants.'} <a href="#/compte${eventType?'?type='+eventType:''}">Configurer la grille tarifaire →</a></p>
     ${base
       ? `<p class="rate-current">Actuel : <strong>${esc(base.label)}</strong> · ${fmtEur(base.amount)}</p>`
       : '<p class="muted hint">Aucun tarif appliqué à ce projet.</p>'}
@@ -802,10 +819,12 @@ function tariffBlock(base, plans) {
         <select name="plan"><option value="">— Choisir dans mes tarifs —</option>${opts}</select>
       </label>
       <div class="row-2">
-        <label>Quantité (heures ou forfaits)<input type="number" name="qty" step="0.5" min="0" value="1" required></label>
+        <label>Quantité (heures ou forfaits)<input type="number" name="qty" step="any" min="0" value="1" required></label>
         <label>Prix unitaire (€)<input type="number" name="unit_price" step="0.01" min="0" required></label>
       </div>
       <label>Libellé sur la facture<input name="label" required></label>
+      <button type="button" class="btn" id="use-planning-hours">Reprendre les heures du planning</button>
+      <p class="muted hint">Pour un tarif horaire, reprenez les créneaux de travail prévus, puis ajustez la quantité aux heures réellement couvertes par ce tarif.</p>
       <p class="rate-total">Total de la prestation : <strong id="rate-total">—</strong></p>
       <button class="btn primary">Appliquer à ce projet</button>
     </form>` : '<p class="empty">Créez d\'abord vos tarifs dans Mon compte.</p>'}
@@ -967,7 +986,7 @@ async function renderProject(id, isAdmin) {
     <div id="project-finance" class="project-section">
       <div class="section-heading"><p class="eyebrow">Gestion</p><h2>Tarification et facturation</h2></div>
       <section class="card finance-work-hours"><h3>Total des heures du planning</h3>${WorkHours.render(sc.data)}<a class="btn small no-print" href="#/outils/${id}?section=conductor">Ouvrir le planning</a></section>
-      <div class="extras">${isAdmin ? tariffBlock(base, rp.data) : ''}${paymentsBlock(pa.data, isAdmin)}${invoicesBlock(iv.data, isAdmin)}</div>
+      <div class="extras">${isAdmin ? tariffBlock(base, rp.data, p.event_type) : ''}${paymentsBlock(pa.data, isAdmin)}${invoicesBlock(iv.data, isAdmin)}</div>
     </div>
     ${isAdmin ? sharingBlock() : ''}`;
 
@@ -1000,7 +1019,7 @@ async function renderProject(id, isAdmin) {
     editForm.onsubmit = async (e) => {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
-      if (await run(sb.rpc('save_catalog_project', {target_project:id,details:{title:f.title.trim(),event_date:f.event_date||null,status:f.status,description:f.description.trim()||null},venue_choice:f.venue_id}), 'Projet enregistré')) { Drafts.clear(e.target); reload(); }
+      if (await run(sb.rpc('save_catalog_project', {target_project:id,details:{title:f.title.trim(),event_type:f.event_type||null,event_date:f.event_date||null,status:f.status,description:f.description.trim()||null},venue_choice:f.venue_id}), 'Projet enregistré')) { Drafts.clear(e.target); reload(); }
     };
     $('#delete-project').onclick = async () => {
       if (!confirm('Supprimer ce projet et tout son contenu ? Cette action est définitive.')) return;
@@ -1081,6 +1100,14 @@ async function renderProject(id, isAdmin) {
       label.value = o.dataset.name;
       if (o.dataset.unit === 'heure' && !Number(qty.value)) qty.value = 1;
       refresh();
+    };
+    $('#use-planning-hours').onclick = () => {
+      if (sel.selectedOptions[0]?.dataset.unit !== 'heure') return toast('Choisissez d’abord un tarif à l’heure.', false);
+      const total = WorkHours.summary(sc.data);
+      if (!total.minutes) return toast('Renseignez les horaires du planning avant de reprendre les heures.', false);
+      qty.value = String(Number((total.minutes / 60).toFixed(6)));
+      refresh();
+      if (total.incomplete || total.unspecified) toast('Quantité reprise. Vérifiez les créneaux dont les horaires ou le jour restent à préciser.', false);
     };
     qty.oninput = refresh;
     unit.oninput = refresh;

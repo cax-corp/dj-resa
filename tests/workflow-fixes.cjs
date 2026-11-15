@@ -87,6 +87,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
     await go('admin/nouveau');
     await page.locator('#new-project').waitFor();
     assert.equal(await page.locator('#new-project input[name=location]').count(), 0);
+    await page.locator('#new-project [name=event_type]').selectOption('soiree_privee');
     await page.locator('#new-project [name=title]').fill('Projet lieu catalogue');
     await page
       .locator('#new-project [name=venue_id]')
