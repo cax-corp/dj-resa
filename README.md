@@ -185,3 +185,13 @@ La migration `add_explicit_planning_days`, enregistrée dans `db/planning-days.s
 Les jetons et rubriques des liens, montants et factures ne changent pas. Les réponses publiques existantes restent identiques à l'installation ; seules les lignes dont le jour est confirmé reçoivent le jour dans le planning public. La migration vérifie ces conservations. Pour une autre base, appliquer ce script après les migrations existantes, avant la publication des fichiers statiques.
 
 Validation : `node tests/planning-days.cjs` (deux formulaires, tri, modification, heures, affichage public et mobile), `tests/planning-days.sql` (droits, bornes, projection et tri publics, transaction annulée), et les suites de régression existantes.
+
+## Formulaire de retour après événement
+
+Le lien d'avis pose d'abord une question globale sur la prestation (1 à 5 étoiles, obligatoire), puis quatre questions facultatives : choix musicaux, ambiance, qualité sonore et organisation. La même échelle est expliquée pour tous les critères, avec « Non évalué / Non concerné » pour ceux que la personne ne souhaite pas noter. Un commentaire libre et deux champs distincts prénom / nom sont facultatifs ; le formulaire peut être envoyé anonymement. Aucune question client / invité n'est posée.
+
+Les critères renseignés apparaissent dans les avis du Bilan, en plus de la moyenne des notes globales. Les anciennes réponses et leurs notes restent inchangées. Le champ historique `audience` reste compatible avec les anciens onglets ouverts, mais est nul lorsqu'il n'est plus fourni et n'est plus affiché. Aucun destinataire n'est classé automatiquement comme invité.
+
+La migration `add_optional_feedback_criteria` est dans `db/feedback-criteria.sql`. Elle ajoute quatre notes facultatives bornées de 1 à 5, rend le rôle historique facultatif et conserve les limites d'envoi, la fermeture des formulaires et les droits existants. La migration contrôle la conservation des avis et liens existants. Appliquer le script avant la publication sur une autre base.
+
+Validation : `tests/feedback-criteria.sql` contrôle en transaction annulée l'enregistrement anonyme, les critères facultatifs, les bornes, l'ancienne forme du message, les permissions et un lien fermé ; `node tests/feedback-criteria.cjs` contrôle le parcours public, les noms facultatifs, les questions, le bilan et le mobile.

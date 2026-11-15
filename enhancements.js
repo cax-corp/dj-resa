@@ -437,24 +437,73 @@ const Enhancements = (() => {
       }
     };
   }
+  const feedbackCriteria = [
+    [
+      'music_rating',
+      'Comment évaluez-vous les choix musicaux ?',
+      'Variété des morceaux et adaptation à la soirée.',
+    ],
+    [
+      'atmosphere_rating',
+      'Comment évaluez-vous l’ambiance ?',
+      'Énergie, animation et plaisir de participer.',
+    ],
+    ['sound_rating', 'Comment évaluez-vous la qualité sonore ?', 'Clarté du son et volume adapté.'],
+    [
+      'organization_rating',
+      'Comment évaluez-vous l’organisation de la prestation ?',
+      'Ponctualité, coordination et déroulement, si vous avez pu en juger.',
+    ],
+  ];
+  const feedbackScale = [
+    'Très insatisfaisant',
+    'Insatisfaisant',
+    'Correct',
+    'Très bien',
+    'Excellent',
+  ];
+  function feedbackScores(review) {
+    const names = {
+      music_rating: 'Choix musicaux',
+      atmosphere_rating: 'Ambiance',
+      sound_rating: 'Qualité sonore',
+      organization_rating: 'Organisation',
+    };
+    const scores = feedbackCriteria.filter(
+      ([key]) => Number.isInteger(review[key]) && review[key] >= 1 && review[key] <= 5
+    );
+    return scores.length
+      ? `<dl class="feedback-scores">${scores.map(([key]) => `<div><dt>${names[key]}</dt><dd>${review[key]}/5</dd></div>`).join('')}</dl>`
+      : '';
+  }
   async function feedbackForm(token, form) {
-    app.innerHTML = `<section class="card public-form"><p class="eyebrow">Après l’événement</p><h1>${esc(form.title)}</h1><p>Votre avis nous aide à améliorer les prochaines prestations.</p><form id="public-feedback-form" class="stack"><fieldset class="rating-field"><legend>Votre note sur 5 étoiles</legend><div class="rating-stars">${[1, 2, 3, 4, 5].map((n) => `<label><input type="radio" name="rating" value="${n}" required aria-label="${n} étoile${n > 1 ? 's' : ''}"><span aria-hidden="true">★</span></label>`).join('')}</div></fieldset><label>Vous étiez<select name="audience"><option value="guest">Invité</option><option value="client">Client / organisateur</option></select></label><label>Prénom / nom (facultatif)<input name="respondent" maxlength="150"></label><label>Votre avis<textarea name="comment" maxlength="3000" rows="5"></textarea></label><button class="btn primary">Envoyer mon avis</button><p id="feedback-result" role="status"></p></form></section>`;
-    document
-      .querySelectorAll('.rating-stars input')
-      .forEach(
-        (input) =>
-          (input.onchange = () =>
-            document
-              .querySelectorAll('.rating-stars label')
-              .forEach((label, i) => label.classList.toggle('selected', i < Number(input.value))))
-      );
+    app.innerHTML = `<section class="card public-form feedback-form"><p class="eyebrow">Votre retour après l’événement</p><h1>${esc(form.title)}</h1><p>Comment avez-vous vécu la prestation ? Votre retour nous aide à préparer les prochaines soirées.</p><form id="public-feedback-form" class="stack"><section class="feedback-section"><fieldset class="rating-field"><legend>Globalement, comment évaluez-vous la prestation ?</legend><div class="rating-stars">${[1, 2, 3, 4, 5].map((n) => `<label title="${n}/5 — ${feedbackScale[n - 1]}"><input type="radio" name="rating" value="${n}" required aria-label="${n} étoile${n > 1 ? 's' : ''} — ${feedbackScale[n - 1]}"><span aria-hidden="true">★</span></label>`).join('')}</div><p id="rating-description" class="feedback-help" aria-live="polite">Choisissez une note de 1 à 5 : 1 = très insatisfaisant, 5 = excellent. Cette note est obligatoire.</p></fieldset></section><section class="feedback-section"><h2>Quelques précisions <span class="muted">(facultatif)</span></h2><p class="feedback-help">Évaluez uniquement ce que vous avez pu apprécier. Sinon, laissez « Non évalué / Non concerné ».</p>${feedbackCriteria.map(([key, question, hint]) => `<label class="feedback-question">${question}<span class="feedback-help">${hint}</span><select name="${key}"><option value="">Non évalué / Non concerné</option>${feedbackScale.map((text, i) => `<option value="${i + 1}">${i + 1}/5 — ${text}</option>`).join('')}</select></label>`).join('')}</section><section class="feedback-section"><label>Un point positif ou une suggestion ? (facultatif)<textarea name="comment" maxlength="3000" rows="4" placeholder="Ce que vous avez aimé, ou ce que nous pourrions améliorer…"></textarea></label></section><section class="feedback-section"><h2>Signer votre avis <span class="muted">(facultatif)</span></h2><p class="feedback-help">Vous pouvez laisser les deux champs vides pour répondre anonymement.</p><div class="row-2"><label>Prénom (facultatif)<input name="first_name" autocomplete="given-name" maxlength="70"></label><label>Nom (facultatif)<input name="last_name" autocomplete="family-name" maxlength="70"></label></div></section><button class="btn primary">Envoyer mon avis</button><p id="feedback-result" role="alert"></p></form></section>`;
+    document.querySelectorAll('.rating-stars input').forEach(
+      (input) =>
+        (input.onchange = () => {
+          const group = input.closest('.rating-field');
+          group
+            .querySelectorAll('.rating-stars label')
+            .forEach((label, i) => label.classList.toggle('selected', i < Number(input.value)));
+          document.getElementById('rating-description').textContent =
+            `${input.value}/5 — ${feedbackScale[Number(input.value) - 1]}`;
+        })
+    );
     document.getElementById('public-feedback-form').onsubmit = async (e) => {
       e.preventDefault();
       const button = e.target.querySelector('button');
       button.disabled = true;
       try {
-        const fields = Object.fromEntries(new FormData(e.target));
-        fields.rating = Number(fields.rating);
+        const values = Object.fromEntries(new FormData(e.target));
+        const fields = {
+          rating: Number(values.rating),
+          respondent: [values.first_name, values.last_name]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+            .join(' '),
+          comment: values.comment,
+        };
+        for (const [key] of feedbackCriteria) if (values[key]) fields[key] = Number(values[key]);
         const { error } = await sb.rpc('submit_event_form', { form_token: token, fields });
         if (error) throw error;
         e.target.innerHTML = '<p role="status">Merci ! Votre avis a bien été enregistré.</p>';
@@ -464,6 +513,7 @@ const Enhancements = (() => {
       }
     };
   }
+
   return {
     downloadQR,
     printList,
@@ -473,5 +523,6 @@ const Enhancements = (() => {
     parseCSV,
     guestRows,
     feedbackForm,
+    feedbackScores,
   };
 })();

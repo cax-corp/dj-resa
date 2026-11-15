@@ -877,7 +877,7 @@ const EventTools = (() => {
       : '—';
     $('#tool-content').insertAdjacentHTML(
       'beforeend',
-      `<section class="feedback-panel"><div class="tool-toolbar"><h2>Avis des clients et invités</h2><button id="create-feedback-link" class="btn primary">Créer un lien de retour</button></div><div class="tool-metrics">${mini('Avis reçus', feedback.length)}${mini('Note moyenne / 5', average)}</div><div class="tool-list">${links.map(linkCard).join('')}</div><div class="tool-list">${feedback.map((x) => `<article class="card"><strong>${'★'.repeat(x.rating)}${'☆'.repeat(5 - x.rating)} · ${x.rating}/5</strong><p class="muted">${esc(x.respondent || 'Anonyme')} · ${x.audience === 'client' ? 'Client / organisateur' : 'Invité'} · ${fmtDateTime(x.created_at)}</p><p class="pre">${esc(x.message)}</p></article>`).join('') || empty('Aucun avis reçu.')}</div></section>`
+      `<section class="feedback-panel"><div class="tool-toolbar"><h2>Retours après l’événement</h2><button id="create-feedback-link" class="btn primary">Créer un lien de retour</button></div><div class="tool-metrics">${mini('Avis reçus', feedback.length)}${mini('Note moyenne / 5', average)}</div><div class="tool-list">${links.map(linkCard).join('')}</div><div class="tool-list">${feedback.map((x) => `<article class="card"><strong>${'★'.repeat(x.rating)}${'☆'.repeat(5 - x.rating)} · ${x.rating}/5</strong><p class="muted">${esc(x.respondent || 'Anonyme')} · ${fmtDateTime(x.created_at)}</p>${Enhancements.feedbackScores(x)}<p class="pre">${esc(x.message)}</p></article>`).join('') || empty('Aucun avis reçu.')}</div></section>`
     );
     handle('#create-feedback-link', async () => {
       await write(

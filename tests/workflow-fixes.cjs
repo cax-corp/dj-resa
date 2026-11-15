@@ -197,7 +197,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
     await page.goto(reviewURL);
     await page.locator('#public-feedback-form').waitFor();
     await page.locator('.rating-stars label').nth(3).click();
-    await page.locator('[name=respondent]').fill('Camille');
+    await page.locator('[name=first_name]').fill('Camille');
     await page.locator('[name=comment]').fill('Une très belle soirée !');
     await page.getByRole('button', { name: 'Envoyer mon avis' }).click();
     await page.getByText('Merci ! Votre avis a bien été enregistré.').waitFor();

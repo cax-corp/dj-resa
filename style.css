@@ -1290,3 +1290,22 @@ body.is-loading .route-progress { display: block; }
 @media print { .work-hours-summary { break-inside: avoid; background: #fff; color: #000; } }
 
 .planning-day { color: var(--text-light); font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+
+/* Structured post-event review, with optional identity and criteria. */
+.feedback-form { max-width: 760px; }
+.feedback-form > p { color: var(--text-light); }
+.feedback-form form { margin-top: 28px; gap: 24px; }
+.feedback-section + .feedback-section { border-top: 1px solid var(--border); padding-top: 24px; }
+.feedback-section h2 { margin: 0 0 10px; padding: 0; border: 0; font-size: 17px; }
+.feedback-section h2 span { font-weight: 400; font-size: 13px; }
+.feedback-help { display: block; color: var(--text-light); font-weight: 400; font-size: 13px; line-height: 1.6; margin: 5px 0 12px; }
+.feedback-question { margin-top: 20px; gap: 6px; font-size: 14px; }
+.feedback-question .feedback-help { margin: 0 0 3px; }
+.feedback-form .rating-field { padding: 20px; }
+.feedback-form .rating-field legend { font-size: 15px; line-height: 1.5; font-weight: 600; max-width: 100%; }
+.feedback-form .rating-stars label { min-width: 42px; min-height: 44px; justify-content: center; align-items: center; }
+.feedback-scores { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 20px; margin: 16px 0; }
+.feedback-scores > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.feedback-scores dt { color: var(--text-light); }
+.feedback-scores dd { font-weight: 600; font-variant-numeric: tabular-nums; }
+@media(max-width:480px) { .feedback-form .rating-field { padding: 12px; } .feedback-form .rating-stars { gap: 3px; justify-content: space-between; } .feedback-scores { grid-template-columns: 1fr; } }
