@@ -207,3 +207,22 @@ La grille de départ reprend les prix déjà utilisés : 25 €/h en base, 35 �
 La migration `add_project_types_and_scoped_rates` est dans `db/project-types.sql`. Elle ajoute deux colonnes facultatives avec contrôle des types et adapte les fonctions de création/modification sans changer leurs droits. Les anciennes requêtes sans type restent compatibles. `db/project-type-starter-rates.sql` est un ajout de données idempotent : il copie les bases horaires générales Normal/Tard dans les six catégories, sans modifier les tarifs généraux, projets, paiements ou factures. Les installations sans ces bases ne reçoivent aucun montant inventé.
 
 Validation : `tests/project-types.sql` pour les droits, types invalides, requêtes historiques et mariage sans date, dans une transaction annulée ; `node tests/project-types.cjs` pour les formulaires, propositions tarifaires, heures, édition de la grille, conservation des montants et affichage mobile.
+
+## Préparation adaptée à chaque type d’événement
+
+Les projets typés proposent une **Préparation dédiée**, un encart de raccourcis et des onglets ordonnés selon leur usage :
+
+- Mariage : mariés, référent, cérémonie, cocktail, entrée, ouverture de bal et interventions.
+- Anniversaire : personne fêtée, occasion, générations présentes, gâteau, animations et musique.
+- Entreprise : objectifs, validation, intervenants, supports techniques, identité de marque et protocole.
+- Association : référents, bénévoles, programme, accès et contraintes sonores.
+- Soirée privée : hôte, ambiance, profil des invités, moments importants et règles du lieu.
+- Autre : objectif, public, attentes, coordination et contraintes à définir.
+
+Les repères horaires de cette fiche servent à la préparation ; le Planning conserve les créneaux définitifs et le calcul des heures. Les outils existants restent accessibles et les projets sans type gardent leur présentation habituelle.
+
+Chaque fiche s'enregistre explicitement et garde un brouillon dans l'onglet, par compte, projet et type. Les champs et recommandations diffèrent par type. Les tâches choisies sont ajoutées à la checklist existante, sans réinitialiser les tâches présentes ; les doublons de libellé sont évités côté serveur. Changer le type ne supprime aucune fiche précédente et n'ajoute aucune tâche automatiquement. Le retour à un ancien type retrouve sa fiche enregistrée.
+
+La migration `add_type_specific_event_preparation` est dans `db/event-preparation.sql`. La table `project_event_briefs` utilise les droits de lecture et modification existants du projet, un contrôle des champs autorisés et une révision pour refuser l'écrasement d'une modification concurrente. Une écriture provenant d'un ancien type après changement est refusée. Aucune fiche n'est exposée aux liens publics existants. Clients et administrateurs conservent leurs droits ; un client d'un projet terminé consulte sa fiche en lecture seule.
+
+Appliquer ce script après les migrations de types pour une autre base. `tests/event-preparation.sql` vérifie les droits, la validation, les versions, les changements de type, les tâches répétées et l'absence de fuite publique dans une transaction annulée. `node tests/event-experience.cjs` couvre les six formulaires, la navigation, l'enregistrement, la conservation, les tâches choisies, les conflits, le mobile et la lecture seule. Le code de présentation est dans `event-experience.js`.

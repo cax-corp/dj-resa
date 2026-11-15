@@ -967,7 +967,8 @@ async function renderProject(id, isAdmin) {
       <button type="button" class="btn" id="archive-project">${p.archived_at ? 'Restaurer le projet' : 'Archiver le projet'}</button>
       <span class="muted hint">L’archivage conserve le contenu, le statut et les liens de partage.</span>
     </div>` : ''}
-    ${EventTools.shortcuts(id)}
+    ${EventExperience.summary(p, isAdmin)}
+    ${EventTools.shortcuts(id, p.event_type)}
     <div id="project-overview" class="grid two project-section">
       ${infoBlock(p, client, isAdmin, vn.data, pv.data[0]?.venue_id)}
       ${updatesBlock(up.data, isAdmin, me.id)}

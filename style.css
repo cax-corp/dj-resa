@@ -1328,3 +1328,25 @@ body.is-loading .route-progress { display: block; }
 .event-rate-prices li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--border); }
 .event-rate-prices strong { white-space: nowrap; }
 #rates-panel { scroll-margin-top: 84px; }
+
+/* Focused preparation paths by event type. */
+.event-experience { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 20px; padding: 24px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin: 0 0 20px; }
+.event-experience h2 { margin: 0 0 8px; font-size: 22px; }
+.event-experience p:not(.eyebrow) { color: var(--text-light); font-size: 14px; max-width: 75ch; }
+.experience-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+.experience-actions a { font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
+.experience-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.experience-fields label { min-width: 0; }
+.experience-fields .experience-wide { grid-column: 1 / -1; }
+.experience-brief .btn, .experience-recommendations .btn { align-self: flex-start; }
+.experience-recommendations { margin-top: 22px; }
+.experience-recommendations .check { align-items: flex-start; }
+.experience-recommendations .check input { margin-top: 4px; flex-shrink: 0; }
+.experience-recommendations > a { margin-top: 20px; }
+.experience-saved { margin-top: 18px; font-size: 12px; }
+@media(max-width:768px) { .event-experience, .experience-fields { grid-template-columns: minmax(0,1fr); } .event-experience { padding: 20px; } .event-experience .btn { white-space: normal; } }
+@media print { .experience-recommendations { display: none !important; } }
+
+.experience-help { margin: 0 0 22px; color: var(--text-light); font-size: 13px; }
+.experience-help summary { cursor: pointer; padding: 5px 0; }
+.experience-help p { margin-top: 10px; max-width: 80ch; }

@@ -305,7 +305,9 @@ const EventTools = (() => {
   async function projectTools(id, section = 'guests') {
     const p = await one('projects', id);
     const editable = admin() || p.status !== 'termine';
+    const experience = EventExperience.profile(p.event_type);
     const sections = {
+      ...(experience ? { preparation: 'Préparation dédiée' } : {}),
       guests: 'Invités',
       requests: 'Demandes musicales',
       conductor: 'Planning',
@@ -317,16 +319,20 @@ const EventTools = (() => {
     };
     const adminOnly = ['requests', 'equipment', 'venue', 'debrief'];
     if (!sections[section] || (!admin() && adminOnly.includes(section))) section = 'guests';
-    app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, 'Outils de préparation et de suivi de l’événement')}<div class="tool-tabs" role="navigation" aria-label="Outils du projet">${Object.entries(
+    app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, experience ? EventTypes.label(p.event_type) + ' · ' + experience.intro : 'Outils de préparation et de suivi de l’événement')}<div class="tool-tabs" role="navigation" aria-label="Outils du projet">${Object.entries(
       sections
     )
       .filter(([k]) => admin() || !adminOnly.includes(k))
+      .sort(([a], [b]) =>
+        experience ? experience.order.indexOf(a) - experience.order.indexOf(b) : 0
+      )
       .map(
         ([k, label]) =>
           `<a href="${toolsUrl(id, k)}" class="${k === section ? 'active' : ''}" ${k === section ? 'aria-current="page"' : ''}>${label}</a>`
       )
       .join('')}</div><div id="tool-content" aria-live="polite">${empty('Chargement…')}</div>`;
     const reload = () => projectTools(id, section);
+    if (section === 'preparation') return projectPreparation(p, editable, reload);
     if (section === 'guests') {
       const items = await rows('project_guests', { project_id: id }, 'full_name');
       collection({
@@ -442,10 +448,73 @@ const EventTools = (() => {
     );
   }
 
+  async function projectPreparation(p, editable, reload) {
+    const config = EventExperience.profile(p.event_type);
+    const [briefs, tasks] = await Promise.all([
+      rows('project_event_briefs', { project_id: p.id, event_type: p.event_type }),
+      rows('project_tasks', { project_id: p.id }),
+    ]);
+    const current = briefs[0];
+    const normalized = (value) => value.trim().toLocaleLowerCase('fr');
+    const hasTask = (label) => tasks.some((task) => normalized(task.label) === normalized(label));
+    $('#tool-content').innerHTML =
+      `<section class="card experience-brief"><h2>${config.title}</h2><p class="tool-note">Utilisez le Planning pour les horaires définitifs et le calcul des heures.</p><details class="experience-help"><summary>Accès et conservation de la fiche</summary><p>Cette fiche reste accessible aux utilisateurs autorisés du projet, sans être diffusée par ses liens publics. Chaque type conserve sa propre préparation : changer de type n’efface pas les autres fiches.</p></details><form class="event-brief-form stack" id="event-brief-${p.event_type}"><div class="experience-fields">${EventExperience.fields(config, current?.details || {}, editable)}</div>${editable ? '<button class="btn primary">Enregistrer la préparation</button>' : ''}</form>${current ? `<p class="muted experience-saved">Dernier enregistrement : ${fmtDateTime(current.updated_at)}</p>` : ''}</section><section class="card experience-recommendations"><h2>Étapes recommandées · ${esc(EventTypes.label(p.event_type))}</h2><p class="tool-note">Choisissez les étapes à ajouter à la checklist existante du projet. Les tâches déjà présentes sont conservées.</p><form class="stack" id="event-recommendations-${p.event_type}">${config.tasks.map((label, i) => `<label class="check"><input type="checkbox" name="task_${i}" data-recommendation="${i}" ${hasTask(label) || !editable ? 'disabled' : ''} ${hasTask(label) ? '' : 'checked'}><span>${esc(label)}${hasTask(label) ? ' <small class="muted">· Déjà dans la checklist</small>' : ''}</span></label>`).join('')}${editable ? `<button class="btn" ${config.tasks.every(hasTask) ? 'disabled' : ''}>Ajouter les tâches choisies</button>` : ''}</form><a class="btn small" href="${projectUrl(p.id)}">Revenir à la checklist du projet</a></section>`;
+    const form = $('#event-brief-' + p.event_type);
+    if (editable)
+      submit(form, async () => {
+        const details = Object.fromEntries(
+          config.fields.map(([key]) => [key, String(form.elements.namedItem(key).value).trim()])
+        );
+        let query = current
+          ? sb
+              .from('project_event_briefs')
+              .update({ details })
+              .eq('project_id', p.id)
+              .eq('event_type', p.event_type)
+              .eq('revision', current.revision)
+          : sb
+              .from('project_event_briefs')
+              .insert({ project_id: p.id, event_type: p.event_type, details });
+        const { data, error } = await query.select('revision').single();
+        if (error || !data) {
+          if (!data && (!error || ['23505', 'PGRST116'].includes(error.code)))
+            throw new Error(
+              'Cette fiche a été modifiée ailleurs. Rechargez la page avant de réessayer.'
+            );
+          throw error;
+        }
+        Drafts.clear(form);
+        toast('Préparation enregistrée');
+        await reload();
+      });
+    const recommendations = $('#event-recommendations-' + p.event_type);
+    if (editable)
+      submit(recommendations, async () => {
+        const selected = [
+          ...recommendations.querySelectorAll('[data-recommendation]:checked:not(:disabled)'),
+        ].map((input) => config.tasks[Number(input.dataset.recommendation)]);
+        if (!selected.length) throw new Error('Choisissez au moins une tâche à ajouter.');
+        const count = await write(
+          sb.rpc('add_event_preparation_tasks', {
+            target_project: p.id,
+            target_type: p.event_type,
+            task_labels: selected,
+          }),
+          null
+        );
+        Drafts.clear(recommendations);
+        toast(`${count} tâche(s) ajoutée(s)`);
+        await reload();
+      });
+  }
+
   async function conductor(p, editable, reload) {
     const items = WorkHours.sort(await rows('schedule_items', { project_id: p.id }, 'start_time'));
     const fields = [
-      field('day_offset', 'Jour du créneau', 'select', { options: WorkHours.dayOptions(p.event_date), value: 0 }),
+      field('day_offset', 'Jour du créneau', 'select', {
+        options: WorkHours.dayOptions(p.event_date),
+        value: 0,
+      }),
       field('start_time', 'Début', 'time', { required: true }),
       field('end_time', 'Fin', 'time'),
       field('kind', 'Type', 'select', { options: SCHEDULE_KIND }),
@@ -1243,8 +1312,11 @@ const EventTools = (() => {
     demandes: inquiries,
     outils: ({ b, params }) => projectTools(b, params.get('section') || 'guests'),
   };
-  function shortcuts(id) {
+  function shortcuts(id, eventType) {
     return `<section class="project-tool-shortcuts no-print" aria-label="Outils de l’événement">${[
+      ...(EventExperience.profile(eventType)
+        ? [['preparation', 'Préparation ' + EventTypes.label(eventType)]]
+        : []),
       ['guests', 'Invités'],
       ['conductor', 'Planning'],
       ['contacts', 'Prestataires'],
