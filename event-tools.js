@@ -303,9 +303,10 @@ const EventTools = (() => {
   }
 
   async function projectTools(id, section = 'guests') {
-    const p = await one('projects', id);
-    const editable = admin() || p.status !== 'termine';
-    const experience = EventExperience.profile(p.event_type);
+    const p = await Production.access(await one('projects', id));
+    const editable = p._canEdit;
+    const experience = p._team ? null : EventExperience.profile(p.event_type);
+    const extraSections = Production.sections();
     const sections = {
       ...(experience ? { preparation: 'Préparation dédiée' } : {}),
       guests: 'Invités',
@@ -316,15 +317,33 @@ const EventTools = (() => {
       equipment: 'Matériel',
       venue: 'Lieu',
       debrief: 'Bilan',
+      ...extraSections,
     };
     const adminOnly = ['requests', 'equipment', 'venue', 'debrief'];
+    if (p._team)
+      for (const key of Object.keys(sections))
+        if (
+          ![
+            'guests',
+            'conductor',
+            'contacts',
+            'documents',
+            'seating',
+            'setup',
+            'music_import',
+          ].includes(key)
+        )
+          delete sections[key];
     if (!sections[section] || (!admin() && adminOnly.includes(section))) section = 'guests';
     app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, experience ? EventTypes.label(p.event_type) + ' · ' + experience.intro : 'Outils de préparation et de suivi de l’événement')}<div class="tool-tabs" role="navigation" aria-label="Outils du projet">${Object.entries(
       sections
     )
       .filter(([k]) => admin() || !adminOnly.includes(k))
       .sort(([a], [b]) =>
-        experience ? experience.order.indexOf(a) - experience.order.indexOf(b) : 0
+        experience
+          ? (experience.order.includes(a) ? experience.order.indexOf(a) : 100) -
+            (experience.order.includes(b) ? experience.order.indexOf(b) : 100)
+          : 0
       )
       .map(
         ([k, label]) =>
@@ -332,6 +351,7 @@ const EventTools = (() => {
       )
       .join('')}</div><div id="tool-content" aria-live="polite">${empty('Chargement…')}</div>`;
     const reload = () => projectTools(id, section);
+    if (extraSections[section]) return Production.project(section, p, reload);
     if (section === 'preparation') return projectPreparation(p, editable, reload);
     if (section === 'guests') {
       const items = await rows('project_guests', { project_id: id }, 'full_name');
@@ -742,7 +762,7 @@ const EventTools = (() => {
       admin() ? rows('document_read_links') : Promise.resolve([]),
     ]);
     $('#tool-content').innerHTML =
-      `<div class="tool-toolbar"><h2>Documents du projet</h2></div>${note('Fichiers privés, 20 Mo maximum. PDF, images, texte, CSV, Word et Excel. Aucun document n’est ajouté automatiquement aux liens publics du projet.')}${admin() ? `<section class="card"><form id="document-form" class="stack"><label>Fichier<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx" required></label><label class="check"><input type="checkbox" name="client_visible">Visible par le client connecté du projet</label><button class="btn primary">Importer le document</button></form></section>` : ''}<div class="tool-list">${items.map((x) => `<article class="card tool-row"><div class="tool-row-content"><strong>${esc(x.name)}</strong><p class="muted">${(x.size_bytes / 1024 / 1024).toFixed(2)} Mo · ${fmtDateTime(x.created_at)} · ${x.client_visible ? 'Visible par le client' : 'Interne'}</p><div id="doc-link-${x.id}"></div></div><div class="tool-row-actions"><a class="btn small" href="${DocumentViewer.privateURL(x.id)}" target="_blank" rel="noopener noreferrer">Ouvrir</a><button class="btn small" data-download="${x.id}">Télécharger</button>${admin() ? `<button class="btn small" data-doc-link="${x.id}">Partager un lien de lecture</button>${links.some((l) => l.document_id === x.id && l.active) ? `<button class="btn small" data-doc-revoke="${x.id}">Révoquer le lien</button>` : ''}<button class="btn small" data-doc-visible="${x.id}">${x.client_visible ? 'Masquer au client' : 'Montrer au client'}</button><button class="btn small" data-doc-delete="${x.id}">Retirer</button>` : ''}</div></article>`).join('') || empty('Aucun document.')}</div>`;
+      `<div class="tool-toolbar"><h2>Documents du projet</h2></div>${note('Fichiers privés, 20 Mo maximum. PDF, images, texte, CSV, Word et Excel. Aucun document n’est ajouté automatiquement aux liens publics du projet.')}${admin() ? `<section class="card"><form id="document-form" class="stack"><label>Fichier<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx" required></label><label class="check"><input type="checkbox" name="client_visible">Visible par le client connecté du projet</label><button class="btn primary">Importer le document</button></form></section>` : ''}<div class="tool-list">${items.map((x) => `<article class="card tool-row"><div class="tool-row-content"><strong>${esc(x.name)}</strong><p class="muted">${(x.size_bytes / 1024 / 1024).toFixed(2)} Mo · ${fmtDateTime(x.created_at)} · ${x.client_visible ? 'Visible par le client' : 'Interne'}${x.team_visible?' · Visible par l’équipe':''}</p><div id="doc-link-${x.id}"></div></div><div class="tool-row-actions"><a class="btn small" href="${DocumentViewer.privateURL(x.id)}" target="_blank" rel="noopener noreferrer">Ouvrir</a><button class="btn small" data-download="${x.id}">Télécharger</button>${admin() ? `<button class="btn small" data-doc-link="${x.id}">Partager un lien de lecture</button>${links.some((l) => l.document_id === x.id && l.active) ? `<button class="btn small" data-doc-revoke="${x.id}">Révoquer le lien</button>` : ''}<button class="btn small" data-doc-visible="${x.id}">${x.client_visible ? 'Masquer au client' : 'Montrer au client'}</button><button class="btn small" data-doc-team="${x.id}">${x.team_visible ? 'Masquer à l’équipe' : 'Montrer à l’équipe'}</button><button class="btn small" data-doc-delete="${x.id}">Retirer</button>` : ''}</div></article>`).join('') || empty('Aucun document.')}</div>`;
     if (admin())
       submit($('#document-form'), async (form) => {
         const file = form.elements.file.files[0];
@@ -838,6 +858,18 @@ const EventTools = (() => {
       });
     }
     bindRevocation();
+    handle('[data-doc-team]', async (button) => {
+      const doc = items.find((x) => x.id === button.dataset.docTeam);
+      await write(
+        sb
+          .from('project_documents')
+          .update({ team_visible: !doc.team_visible })
+          .eq('id', doc.id)
+          .eq('project_id', p.id),
+        'Visibilité équipe mise à jour'
+      );
+      await reload();
+    });
     handle('[data-doc-visible]', async (button) => {
       const doc = items.find((x) => x.id === button.dataset.docVisible);
       await write(
@@ -984,7 +1016,7 @@ const EventTools = (() => {
         'Renseignez ici votre propre matériel. Dans chaque projet, ouvrez Matériel pour choisir ce que vous emportez et préparer votre checklist.'
       ),
       render: (x) =>
-        `<strong>${esc(x.name)}</strong><span class="status">${x.units} unité(s) · ${x.active ? 'Dans mon inventaire' : 'Non proposé dans les projets'}</span><p>${esc(x.category)}${x.reference ? ' · ' + esc(x.reference) : ''}</p><p class="pre">${esc(x.notes)}</p>${selections
+        `<strong>${esc(x.name)}</strong><span class="status">${x.units} unité(s) · ${x.active ? 'Dans mon inventaire' : 'Non proposé dans les projets'}</span><p>${esc(x.category)}${x.reference ? ' · ' + esc(x.reference) : ''}</p><p class="pre">${esc(x.notes)}</p>${AudioSetup.catalogButton(x.id)}${selections
           .filter((r) => r.equipment_id === x.id && r.state !== 'cancelled')
           .map(
             (r) =>
@@ -992,6 +1024,7 @@ const EventTools = (() => {
           )
           .join('')}`,
     });
+    AudioSetup.bindCatalog();
   }
   async function venues() {
     if (!admin()) throw new Error('Accès réservé à l’administrateur.');
@@ -1022,7 +1055,10 @@ const EventTools = (() => {
       rows('projects', {}, 'event_date'),
       rows('project_tasks', {}, 'created_at'),
     ]);
-    const editable = projects.filter((p) => admin() || p.status !== 'termine');
+    if (me.role === 'dj') await Promise.all(projects.map((p) => Production.access(p)));
+    const editable = projects.filter((p) =>
+      me.role === 'dj' ? p._canEdit : admin() || p.status !== 'termine'
+    );
     const fields = [
       field('project_id', 'Projet', 'select', {
         required: true,
@@ -1055,7 +1091,7 @@ const EventTools = (() => {
                 .filter((t) => taskState(t) === state)
                 .map((t) => {
                   const p = projects.find((p) => p.id === t.project_id);
-                  const canEdit = admin() || p.status !== 'termine';
+                  const canEdit = me.role === 'dj' ? p._canEdit : admin() || p.status !== 'termine';
                   return `<article class="card board-task ${!t.done && t.due_date && t.due_date < today() ? 'is-overdue' : ''}"><a class="muted" href="${projectUrl(t.project_id)}">${esc(p.title)}</a><h3>${esc(t.label)}</h3><p><span class="status ${t.priority === 'urgent' ? 'pending' : ''}">${priorityNames[t.priority || 'normal']}</span> ${esc(t.assignee || 'Non attribué')}</p>${t.due_date ? `<p class="${!t.done && t.due_date < today() ? 'warn-text' : 'muted'}">Échéance : ${fmtDate(t.due_date)}</p>` : ''}${canEdit ? `<label>Avancement<select data-task-state="${t.id}">${optionList({ todo: 'À faire', doing: 'En cours', done: 'Terminé' }, taskState(t))}</select></label><button class="btn small" data-task-edit="${t.id}">Échéance / responsable</button>` : ''}</article>`;
                 })
                 .join('') || empty('Aucune tâche.')
@@ -1314,13 +1350,14 @@ const EventTools = (() => {
   };
   function shortcuts(id, eventType) {
     return `<section class="project-tool-shortcuts no-print" aria-label="Outils de l’événement">${[
-      ...(EventExperience.profile(eventType)
+      ...(me.role !== 'dj' && EventExperience.profile(eventType)
         ? [['preparation', 'Préparation ' + EventTypes.label(eventType)]]
         : []),
       ['guests', 'Invités'],
       ['conductor', 'Planning'],
       ['contacts', 'Prestataires'],
       ['documents', 'Documents'],
+      ...Production.shortcuts(id),
       ...(admin()
         ? [
             ['requests', 'Demandes musicales'],
@@ -1340,6 +1377,7 @@ const EventTools = (() => {
     return [
       ['calendrier', 'Calendrier', 'calendar'],
       ['taches', 'À faire', 'tasks'],
+      ...(admin() ? [['equipe', 'Équipe', 'clients']] : []),
       ...(admin()
         ? [
             ['materiel', 'Mon matériel', 'equipment'],

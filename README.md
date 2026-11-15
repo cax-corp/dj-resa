@@ -226,3 +226,43 @@ Chaque fiche s'enregistre explicitement et garde un brouillon dans l'onglet, par
 La migration `add_type_specific_event_preparation` est dans `db/event-preparation.sql`. La table `project_event_briefs` utilise les droits de lecture et modification existants du projet, un contrôle des champs autorisés et une révision pour refuser l'écrasement d'une modification concurrente. Une écriture provenant d'un ancien type après changement est refusée. Aucune fiche n'est exposée aux liens publics existants. Clients et administrateurs conservent leurs droits ; un client d'un projet terminé consulte sa fiche en lecture seule.
 
 Appliquer ce script après les migrations de types pour une autre base. `tests/event-preparation.sql` vérifie les droits, la validation, les versions, les changements de type, les tâches répétées et l'absence de fuite publique dans une transaction annulée. `node tests/event-experience.cjs` couvre les six formulaires, la navigation, l'enregistrement, la conservation, les tâches choisies, les conflits, le mobile et la lecture seule. Le code de présentation est dans `event-experience.js`.
+
+## Invitations, placement, équipe, rentabilité et production audio
+
+Nouveaux onglets dans les outils du projet :
+
+- **Réponses invités** : générer les liens personnels manquants depuis la liste existante, exporter les invitations en CSV, copier un lien ou télécharger son QR en PNG. Chaque lien concerne uniquement son invité/foyer, sans connexion. Présence, accompagnants et besoins alimentaires mettent à jour la fiche existante. La limite d'accompagnants est réglable et les liens peuvent être fermés/réouverts. Aucun email n'est envoyé automatiquement. Les autres invités, notes privées et coordonnées ne figurent pas dans la réponse publique. Limite de 20 envois par minute et par lien.
+- **Plan de tables** : tables rondes/rectangulaires, capacités, déplacement sur le plan, coordonnées accessibles, affectation par listes ou glisser-déposer, alerte de dépassement et import des groupes existants. Les placements enregistrés mettent à jour `project_guests.table_name`. Les modifications ultérieures de ce champ dans la liste synchronisent le plan et invalident les brouillons concurrents ; les autres informations des invités ne sont pas remplacées. Export du plan en SVG avec légende et impression isolée des placements.
+- **Rentabilité** (administrateur) : recettes prévues/encaissées issues des lignes existantes, frais de déplacement, équipe, matériel, achats et autres frais, coût interne horaire facultatif, marge prévisionnelle et revenu disponible par heure. Les montants doivent être saisis sur une base cohérente HT/TTC. Ce calcul ne réécrit pas les tarifs, paiements ou factures.
+- **Équipe** (administrateur) : comptes de profil `dj`, affectations par projet en lecture seule ou collaborateur. Les membres voient les données opérationnelles des projets affectés ; les collaborateurs peuvent modifier invités, planning, contacts, tâches, playlists, placement et setup. Les tarifs, paiements, factures, coûts, marges, liens RSVP et fiches de préparation client restent privés aux rôles historiques autorisés. Les documents ne deviennent visibles que via le bouton explicite **Montrer à l’équipe**, masqué par défaut. Un projet terminé reste en lecture seule pour l’équipe. Retirer une affectation bloque les lectures suivantes.
+- **Import musical** : enregistrer le lien canonique d'une playlist Spotify, ou importer un CSV exporté de Spotify (type Exportify) avec Track Name / Artist Name(s) / Track URI, ou Titre / Artiste / URL. Prévisualisation puis ajout explicite à la sélection choisie, dédoublonné par titre/artiste. Limites : 5 Mo et 2 000 titres par fichier. La connexion directe à l'API Spotify est reportée à la demande du propriétaire ; aucun Client ID n'est requis pour le lien et le CSV. Un lien seul n'importe pas automatiquement les morceaux.
+
+### Setup et câbles de mon matériel
+
+Dans **Mon matériel → Connectique audio**, définir les prises de chaque appareil : nom, entrée/sortie, connecteur, prise mâle/femelle, niveau/protocole et nombre de canaux. Deux sorties XLR gauche/droite sont deux ports mono distincts ; une prise stéréo ou paire RCA utilisée ensemble peut être décrite avec deux canaux. Les signaux ligne et puissance haut-parleur sont distincts.
+
+Sélectionner les exemplaires dans le matériel du projet, puis ouvrir **Setup et câbles**. Placer les appareils et des zones nommées, définir les dimensions physiques, puis relier les sorties aux entrées. La proposition automatique ne relie que les correspondances uniques des deux côtés ; les choix ambigus restent manuels. Les ports déjà utilisés, signaux/canaux incompatibles et boucles sont refusés par l'éditeur. Le serveur contrôle aussi les niveaux/protocoles, la quantité sélectionnée, les ports et les révisions. Une conversion optique/coaxiale ou de niveau audio demande un convertisseur avec ses propres ports.
+
+La liste déduit les connecteurs complémentaires des câbles et leurs quantités, avec longueurs choisies ou estimées (distance entre appareils, 20 % de marge et 1 m supplémentaire, arrondie à une longueur courante). Le cheminement réel, la section des câbles HP et les limites des liaisons numériques/USB restent à vérifier lors de la préparation. Export SVG du plan avec légende, checklist imprimable des câbles et impression des liaisons. Le plan et la liste restent sans interface du site sur le document imprimé.
+
+Les setups gardent une copie de la connectique au moment où un appareil est ajouté : modifier le catalogue ne réécrit pas les anciens plans. L'actualisation d'une copie est explicite et retire les liaisons devenues incompatibles du brouillon seulement après confirmation. Les plans sont enregistrés par révision et gardent des brouillons dans l'onglet, par compte/projet. Une sauvegarde concurrente est refusée. Les quantités possédées et les sélections de matériel existantes ne sont pas modifiées par l'éditeur de setup.
+
+### Installation
+
+Sur une autre base, appliquer après les migrations existantes, dans cet ordre :
+
+1. `db/production-access.sql` : membres, droits opérationnels, visibilité équipe des documents, coûts et import musical.
+2. `db/guest-rsvp-seating.sql` : liens personnels de réponse et stockage des placements.
+3. `db/audio-setups.sql` : connectique et setups.
+4. `db/production-validation.sql`, puis `db/production-board-fixes.sql` : validation des structures et des protocoles.
+5. `db/seating-synchronization.sql` : synchronisation des groupes invités et contrôle des modifications concurrentes.
+
+Les fonctions publiques de lecture/écriture financière existantes ne sont pas élargies aux membres. Les fonctions privilégiées de RSVP et sauvegarde des plans restent dans `production_private`, avec autorisation explicite par jeton ou utilisateur/projet et `search_path` vide. Les nouvelles tables ont des politiques RLS. Aucune invitation, compte équipe ou plan n'est créé automatiquement par l'installation.
+
+Déployer `supabase/functions/create-team-user/index.ts` sous le nom `create-team-user`, `verify_jwt=false` : la fonction vérifie elle-même le JWT puis le profil administrateur avant de créer un compte de rôle `dj`. Les variables standard Supabase restent côté serveur. Le mot de passe provisoire doit avoir au moins 12 caractères et n'est jamais retourné, journalisé ou conservé en brouillon. Le propriétaire transmet lui-même les identifiants ; le membre peut changer son mot de passe dans Mon compte. Aucun email n'est envoyé par cette fonction.
+
+### Validation
+
+`tests/production.sql` vérifie sur la base réelle, en transaction annulée, les rôles lecteur/collaborateur, l'absence d'accès aux finances et aux autres projets, la révocation, les documents explicitement partagés, la synchronisation du placement, les révisions, l'import musical, les exemplaires de matériel, les connexions incompatibles et les réponses publiques limitées à leur invitation. Les numéros de facture de test sont explicites pour ne pas consommer la séquence réelle.
+
+`node tests/production-ui.cjs` couvre la connectique, deux câbles stéréo, plans/SVG/impressions/brouillons, placement/capacité, RSVP/fermeture, marge, CSV, équipe et mobile. `node tests/audio-routing.cjs` vérifie le calcul des câbles et les incompatibilités ; `node tests/team-account-edge.cjs` vérifie l'authentification administrateur, le rôle imposé et le nettoyage d'une création incomplète, sans créer de compte réel. Les suites historiques restent applicables.

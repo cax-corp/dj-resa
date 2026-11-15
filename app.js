@@ -119,7 +119,7 @@ const navIcon = (name) => {
 function renderHeader() {
   const nav = $('#nav');
   const { a, b } = parseHash();
-  const workspace = !!me && !['partage','invites','demande','avis','lecture'].includes(a);
+  const workspace = !!me && !['partage','invites','demande','avis','lecture','rsvp'].includes(a);
   document.body.dataset.workspace = String(workspace);
   $('#logout').classList.toggle('hidden', !me);
   if (!workspace) { nav.innerHTML = ''; return; }
@@ -134,7 +134,7 @@ function renderHeader() {
   const name = me.full_name || me.email || (me.role === 'admin' ? 'Administrateur' : 'Mon espace');
   $('#profile-name').textContent = name;
   $('#profile-avatar').textContent = name.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
-  $('#profile-role').textContent = me.role === 'admin' ? 'Administrateur' : 'Espace client';
+  $('#profile-role').textContent = me.role === 'admin' ? 'Administrateur' : me.role==='dj'?'Équipe':'Espace client';
 }
 
 let routeVersion = 0;
@@ -145,6 +145,7 @@ async function route() {
   document.body.dataset.view = '';
   try {
     const parsed = parseHash();
+    if(parsed.a==='rsvp' && parsed.b){renderHeader();return await Production.publicRsvp(parsed.b);}
     if(parsed.a==='lecture' && parsed.b){renderHeader();return await DocumentViewer.open({token:parsed.b});}
     if (parsed.a === 'partage' && parsed.b) {
       renderHeader();
@@ -172,6 +173,7 @@ async function dispatch({ a, b, c, params }) {
   if(a==='document' && b)return DocumentViewer.open({id:b});
   if (EventTools.pages[a]) return EventTools.pages[a]({a,b,c,params});
   if (a === 'compte') return renderAccount();
+  if (a === 'equipe') return Production.teamAccounts();
   if (a === 'factures' && b) return renderInvoice(b);
 
   if (me.role === 'admin') {
@@ -272,7 +274,7 @@ async function renderAccount() {
   app.innerHTML = `
     <div class="page-head"><div>
       <h1>Mon compte</h1>
-      <p>${esc(me.email || '')} · ${isAdmin ? 'Administrateur' : 'Client'}</p>
+      <p>${esc(me.email || '')} · ${isAdmin ? 'Administrateur' : me.role==='dj'?'Équipe':'Client'}</p>
     </div></div>
     <div class="grid two">
       <section class="card">
@@ -918,22 +920,22 @@ async function renderProject(id, isAdmin) {
   if (!me) return renderLogin();
   const none = Promise.resolve({ data: [], error: null });
   const [pr, up, tr, sc, tk, pa, iv, rp, vn, pv] = await Promise.all([
-    sb.from('projects').select('*, client:profiles!client_id(full_name, email, phone, company, billing_address)').eq('id', id).single(),
-    sb.from('project_updates').select('*').eq('project_id', id).order('created_at', { ascending: false }),
+    sb.from('projects').select(me.role==='dj'?'*':'*, client:profiles!client_id(full_name, email, phone, company, billing_address)').eq('id', id).single(),
+    me.role==='dj'?none:sb.from('project_updates').select('*').eq('project_id', id).order('created_at', { ascending: false }),
     sb.from('project_tracks').select('*').eq('project_id', id).order('created_at'),
     sb.from('schedule_items').select('*').eq('project_id', id).order('start_time'),
     sb.from('project_tasks').select('*').eq('project_id', id).order('created_at'),
-    sb.from('project_payments').select('*').eq('project_id', id).order('created_at'),
-    sb.from('invoices').select('id, number, issue_date, total').eq('project_id', id).order('created_at', { ascending: false }),
+    me.role==='dj'?none:sb.from('project_payments').select('*').eq('project_id', id).order('created_at'),
+    me.role==='dj'?none:sb.from('invoices').select('id, number, issue_date, total').eq('project_id', id).order('created_at', { ascending: false }),
     isAdmin ? sb.from('rate_plans').select('*').order('name') : none,
     isAdmin ? sb.from('venues').select('*').order('name') : none,
     isAdmin ? sb.from('project_venues').select('venue_id').eq('project_id',id) : none
   ]);
   for (const r of [pr, up, tr, sc, tk, pa, iv, rp, vn, pv]) if (r.error) throw r.error;
 
-  const p = pr.data;
+  const p = await Production.access(pr.data);
   const client = p.client || {};
-  const canEdit = isAdmin || p.status !== 'termine';
+  const canEdit = p._canEdit;
   const must = tr.data.filter(t => t.kind === 'must_play');
   const avoid = tr.data.filter(t => t.kind === 'do_not_play');
   const base = pa.data.find(x => x.is_base);
@@ -959,7 +961,7 @@ async function renderProject(id, isAdmin) {
       <button type="button" class="active" data-project-section="project-overview">Vue d’ensemble</button>
       <button type="button" data-project-section="project-preparation">Préparation</button>
       <button type="button" data-project-section="project-music">Musique</button>
-      <button type="button" data-project-section="project-finance">Finances</button>
+      ${!p._team?'<button type="button" data-project-section="project-finance">Finances</button>':''}
       ${isAdmin ? '<button type="button" data-project-section="project-sharing">Partage</button>' : ''}
     </div>
     ${p.archived_at ? `<div class="archive-notice" role="status">Projet archivé le ${fmtDateTime(p.archived_at)}. Le contenu et les liens de partage restent accessibles.</div>` : ''}
@@ -967,11 +969,11 @@ async function renderProject(id, isAdmin) {
       <button type="button" class="btn" id="archive-project">${p.archived_at ? 'Restaurer le projet' : 'Archiver le projet'}</button>
       <span class="muted hint">L’archivage conserve le contenu, le statut et les liens de partage.</span>
     </div>` : ''}
-    ${EventExperience.summary(p, isAdmin)}
+    ${!p._team ? EventExperience.summary(p, isAdmin) : ''}
     ${EventTools.shortcuts(id, p.event_type)}
     <div id="project-overview" class="grid two project-section">
       ${infoBlock(p, client, isAdmin, vn.data, pv.data[0]?.venue_id)}
-      ${updatesBlock(up.data, isAdmin, me.id)}
+      ${!p._team ? updatesBlock(up.data, isAdmin, me.id) : ''}
     </div>
 
     ${mapCard(p.location)}
@@ -984,11 +986,11 @@ async function renderProject(id, isAdmin) {
       <div class="section-heading"><p class="eyebrow">Sélection musicale</p><h2>La bande-son du projet</h2></div><div class="actions no-print music-print-actions"><button class="btn small" id="print-must-play">Imprimer « À passer absolument »</button></div>
       <div class="grid two">${trackPanel('must_play', 'À passer absolument', must, canEdit)}${trackPanel('do_not_play', 'À ne pas passer', avoid, canEdit)}</div>
     </div>
-    <div id="project-finance" class="project-section">
+    ${!p._team ? `<div id="project-finance" class="project-section">
       <div class="section-heading"><p class="eyebrow">Gestion</p><h2>Tarification et facturation</h2></div>
       <section class="card finance-work-hours"><h3>Total des heures du planning</h3>${WorkHours.render(sc.data)}<a class="btn small no-print" href="#/outils/${id}?section=conductor">Ouvrir le planning</a></section>
       <div class="extras">${isAdmin ? tariffBlock(base, rp.data, p.event_type) : ''}${paymentsBlock(pa.data, isAdmin)}${invoicesBlock(iv.data, isAdmin)}</div>
-    </div>
+    </div>` : ''}
     ${isAdmin ? sharingBlock() : ''}`;
 
   $$('[data-project-section]').forEach(button => button.onclick = () => {
@@ -1029,7 +1031,8 @@ async function renderProject(id, isAdmin) {
   }
 
   // Suivi
-  $('#update-form').onsubmit = async (e) => {
+  const updateForm = $('#update-form');
+  if(updateForm) updateForm.onsubmit = async (e) => {
     e.preventDefault();
     const body = new FormData(e.target).get('body').trim();
     if (!body) return;

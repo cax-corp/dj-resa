@@ -4,7 +4,7 @@ const Drafts = (() => {
   const pending = new Set();
   const allowed = (form) =>
     form?.id &&
-    !['auth-form', 'public-event-form', 'public-feedback-form'].includes(form.id) &&
+    !['auth-form', 'public-event-form', 'public-feedback-form', 'public-rsvp-form'].includes(form.id) &&
     typeof me !== 'undefined' &&
     me?.id;
   const key = (form) => {

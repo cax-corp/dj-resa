@@ -1350,3 +1350,40 @@ body.is-loading .route-progress { display: block; }
 .experience-help { margin: 0 0 22px; color: var(--text-light); font-size: 13px; }
 .experience-help summary { cursor: pointer; padding: 5px 0; }
 .experience-help p { margin-top: 10px; max-width: 80ch; }
+
+/* Production workspace, private margins and editable technical plans. */
+.production-section { margin-top: 24px; }
+.production-inline { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin: 18px 0; }
+.production-inline > label { flex: 1 1 170px; min-width: 0; }
+.production-inline > .btn { flex: 0 1 auto; }
+.production-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin: 24px 0; }
+.production-metrics span { display: block; font-size: 13px; color: var(--text-light); }
+.production-metrics strong { display: block; font-size: 25px; margin-top: 8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.production-stage { max-width: 100%; overflow: auto; border: 1px solid var(--border); background: #fff; border-radius: 8px; margin: 16px 0 24px; }
+.production-stage svg { width: 100%; min-width: 760px; display: block; height: auto; touch-action: auto; }
+.production-stage [data-stage-id] { touch-action: none; }
+.production-stage [data-stage-id]:focus { outline: none; }
+.production-stage [data-stage-id]:focus > rect, .production-stage [data-stage-id]:focus > circle { stroke: #111; stroke-width: 4px; }
+.board-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 22px; }
+.board-controls > * { min-width: 0; }
+.board-controls h3 { margin: 0 0 16px; }
+.board-controls .stack { margin: 18px 0; }
+.board-controls input, .board-controls select { min-width: 0; max-width: 100%; }
+.production-table-scroll { max-width: 100%; overflow: auto; }
+.production-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+.production-table th, .production-table td { text-align: left; border-bottom: 1px solid var(--border); padding: 12px; font-size: 13px; }
+.production-table th { background: var(--bg-alt); }
+.guest-drag-list { display: flex; flex-wrap: wrap; gap: 8px; max-height: 320px; overflow: auto; margin-top: 16px; padding: 4px; }
+.guest-drag-list .btn { white-space: normal; cursor: grab; }
+.production-preview { max-height: 280px; overflow: auto; margin: 18px 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.production-preview p { padding: 6px 0; font-size: 13px; }
+.audio-dialog { width: min(960px,calc(100% - 32px)); max-height: 88vh; margin: auto; padding: 26px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--bg); overflow: auto; }
+.audio-dialog::backdrop, .production-qr::backdrop { background: #0007; }
+.production-qr { width: min(380px,calc(100% - 32px)); margin: auto; padding: 24px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+.production-qr svg { display: block; width: 100%; height: auto; background: white; margin: 12px 0; }
+.production-qr .btn { margin-top: 8px; }
+@media(max-width:900px) { .board-controls { grid-template-columns: minmax(0,1fr); } }
+@media(max-width:600px) { .production-metrics { grid-template-columns: minmax(0,1fr); } .audio-dialog { padding: 18px; } .audio-dialog .row-2 { grid-template-columns: minmax(0,1fr); } .production-inline .btn { white-space: normal; } }
+@media print { .audio-dialog, .production-qr { display: none !important; } }
+
+@media(max-width:600px) { .production-table { min-width: 0; table-layout: fixed; } .production-table th, .production-table td { padding: 7px; font-size: 12px; overflow-wrap: anywhere; } .production-table th:first-child { width: 55%; } }

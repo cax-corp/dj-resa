@@ -3,16 +3,22 @@
   const root = document.getElementById('app');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const running = new Set();
+  function revealActiveTool() {
+    const tabs = root.querySelector('.tool-tabs'),
+      active = tabs?.querySelector('a[aria-current="page"]');
+    if (!active) return;
+    const box = tabs.getBoundingClientRect(),
+      item = active.getBoundingClientRect();
+    if (item.left < box.left + 7 || item.right > box.right - 7)
+      tabs.scrollLeft += item.left - box.left - 7;
+  }
+  let resizeFrame = 0;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(revealActiveTool);
+  });
   const observer = new MutationObserver((records) => {
-    const tabs = root.querySelector('.tool-tabs');
-    const active = tabs?.querySelector('a[aria-current="page"]');
-    if (
-      active &&
-      (active.offsetLeft < tabs.scrollLeft ||
-        active.offsetLeft + active.offsetWidth > tabs.scrollLeft + tabs.clientWidth)
-    ) {
-      tabs.scrollLeft = active.offsetLeft - 7;
-    }
+    revealActiveTool();
     if (reduced.matches || document.hidden) return;
     const added = records.flatMap((record) => [...record.addedNodes]);
     const panels = added.filter(
