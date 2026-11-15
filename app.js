@@ -640,7 +640,7 @@ async function renderPublicProject(token) {
       <div class="grid two">
         ${has('must_play') ? trackPanel('must_play', 'À passer absolument', p.must_play, false) : ''}
         ${has('do_not_play') ? trackPanel('do_not_play', 'À ne pas passer', p.do_not_play, false) : ''}
-        ${has('schedule') ? scheduleBlock(p.schedule, false) : ''}
+        ${has('schedule') ? scheduleBlock(p.schedule, false, p.event_date) : ''}
         ${has('tasks') ? tasksBlock(p.tasks, false) : ''}
         ${has('payments') ? paymentsBlock(p.payments, false) : ''}
         ${has('updates') ? `<section class="card"><h2>Suivi</h2><div class="updates">${p.updates.map(u => `
@@ -722,7 +722,8 @@ function mapCard(place) {
   </details>`;
 }
 
-function scheduleBlock(items, canEdit) {
+function scheduleBlock(items, canEdit, eventDate) {
+  items = WorkHours.sort(items);
   const kindOpts = Object.entries(SCHEDULE_KIND)
     .map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
   return `
@@ -734,7 +735,7 @@ function scheduleBlock(items, canEdit) {
         <li class="tl-item">
           <div class="tl-time">${hm(s.start_time)}${s.end_time ? `<small>${hm(s.end_time)}</small>` : ''}</div>
           <div class="tl-body">
-            <span class="tl-kind">${SCHEDULE_KIND[s.kind] || 'Autre'}</span>
+            <p class="planning-day">${esc(WorkHours.label(s, eventDate))}</p><span class="tl-kind">${SCHEDULE_KIND[s.kind] || 'Autre'}</span>
             <strong>${esc(s.title)}</strong>
             ${s.details ? `<p>${esc(s.details)}</p>` : ''}
           </div>
@@ -743,6 +744,7 @@ function scheduleBlock(items, canEdit) {
     </ol>
     ${canEdit ? `
     <form id="schedule-form" class="track-form stack no-print">
+      <label>Jour du créneau<select name="day_offset">${Object.entries(WorkHours.dayOptions(eventDate)).map(([value,label])=>`<option value="${value}">${esc(label)}</option>`).join('')}</select></label>
       <div class="row-2">
         <label>Début<input type="time" name="start_time" required></label>
         <label>Fin<input type="time" name="end_time"></label>
@@ -956,7 +958,7 @@ async function renderProject(id, isAdmin) {
 
     <div id="project-preparation" class="project-section">
       <div class="section-heading"><p class="eyebrow">Organisation</p><h2>Préparation de l’événement</h2></div>
-      <div class="extras">${scheduleBlock(sc.data, canEdit)}${tasksBlock(tk.data, canEdit)}</div>
+      <div class="extras">${scheduleBlock(sc.data, canEdit, p.event_date)}${tasksBlock(tk.data, canEdit)}</div>
     </div>
     <div id="project-music" class="project-section">
       <div class="section-heading"><p class="eyebrow">Sélection musicale</p><h2>La bande-son du projet</h2></div><div class="actions no-print music-print-actions"><button class="btn small" id="print-must-play">Imprimer « À passer absolument »</button></div>
@@ -1037,7 +1039,7 @@ async function renderProject(id, isAdmin) {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
     if (await run(sb.from('schedule_items').insert({
-      project_id: id, start_time: f.start_time, end_time: f.end_time || null,
+      project_id: id, day_offset: Number(f.day_offset), start_time: f.start_time, end_time: f.end_time || null,
       kind: f.kind, title: f.title.trim(), details: f.details?.trim() || null
     }))) reload();
   };

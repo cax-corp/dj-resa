@@ -47,9 +47,10 @@ const base = process.env.TEST_URL || 'http://127.0.0.1:8000';
     await page.goto(planning);
     await page.getByRole('heading', { name: 'Planning de l’événement' }).waitFor();
     assert.equal(await page.locator('.tool-tabs a.active').textContent(), 'Planning');
-    const add = async (title, start, end) => {
+    const add = async (title, start, end, day = 0) => {
       await page.locator('#tool-editor').evaluate((el) => (el.open = true));
       const form = page.locator('#tool-editor-form');
+      await form.locator('[name=day_offset]').selectOption(String(day));
       await form.locator('[name=title]').fill(title);
       await form.locator('[name=start_time]').fill(start);
       if (end) await form.locator('[name=end_time]').fill(end);
@@ -59,8 +60,8 @@ const base = process.env.TEST_URL || 'http://127.0.0.1:8000';
     await add('Montage', '18:00', '20:00');
     await add('Sonorisation', '19:00', '21:00');
     await add('Animation', '23:00', '02:00');
-    await add('Séquence simultanée', '00:30', '01:00');
-    await add('Démontage à préciser', '03:00', '');
+    await add('Séquence simultanée', '00:30', '01:00', 1);
+    await add('Démontage à préciser', '03:00', '', 1);
     await page.locator('[data-work-minutes="360"]').waitFor();
     await page.getByText(/1 créneau non comptabilisé/).waitFor();
     await page.evaluate(

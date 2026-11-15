@@ -1288,3 +1288,5 @@ body.is-loading .route-progress { display: block; }
 .finance-work-hours .work-hours-summary { margin: 16px 0; }
 @media (max-width: 768px) { .work-hours-summary { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; } }
 @media print { .work-hours-summary { break-inside: avoid; background: #fff; color: #000; } }
+
+.planning-day { color: var(--text-light); font-size: 13px; font-weight: 600; margin-bottom: 7px; }

@@ -443,8 +443,9 @@ const EventTools = (() => {
   }
 
   async function conductor(p, editable, reload) {
-    const items = await rows('schedule_items', { project_id: p.id }, 'start_time');
+    const items = WorkHours.sort(await rows('schedule_items', { project_id: p.id }, 'start_time'));
     const fields = [
+      field('day_offset', 'Jour du créneau', 'select', { options: WorkHours.dayOptions(p.event_date), value: 0 }),
       field('start_time', 'Début', 'time', { required: true }),
       field('end_time', 'Fin', 'time'),
       field('kind', 'Type', 'select', { options: SCHEDULE_KIND }),
@@ -462,9 +463,9 @@ const EventTools = (() => {
       fixed: { project_id: p.id },
       canEdit: editable,
       after: reload,
-      extra: `<div class="tool-toolbar"><h2>Planning de l’événement</h2><button class="btn" id="live-mode">Mode direct</button><button class="btn" id="print-conductor">Imprimer</button></div>${note('Renseignez le début et la fin de chaque créneau pour calculer les heures de travail. Une seule séquence peut être marquée en cours à la fois.')}${WorkHours.render(items)}`,
+      extra: `<div class="tool-toolbar"><h2>Planning de l’événement</h2><button class="btn" id="live-mode">Mode direct</button><button class="btn" id="print-conductor">Imprimer</button></div>${note('Choisissez le jour de début de chaque créneau par rapport à la date de l’événement, puis ses horaires. Pour le rangement du lendemain, choisissez « Lendemain (J+1) ». Une seule séquence peut être marquée en cours à la fois.')}${WorkHours.render(items)}`,
       render: (x) =>
-        `<div class="conductor-step ${x.run_state === 'current' ? 'is-current' : ''}"><div class="conductor-time">${hm(x.start_time)}${x.end_time ? ' – ' + hm(x.end_time) : ''}</div><p class="work-duration">${WorkHours.duration(x) === null ? 'Durée à compléter' : WorkHours.format(WorkHours.duration(x))}${x.end_time && x.end_time < x.start_time ? ' · fin le lendemain' : ''}</p><strong>${esc(x.title)}</strong><span class="status">${{ pending: 'À venir', current: 'En cours', done: 'Terminé' }[x.run_state || 'pending']}</span><p>${esc(x.speaker)}${x.song ? ' · ♫ ' + esc(x.song) : ''}</p><p class="pre">${esc(x.details)}</p>${x.cue ? `<p class="conductor-cue">${esc(x.cue)}</p>` : ''}${editable ? `<div class="actions no-print"><button class="btn small" data-step="${x.id}" data-state="current">Lancer</button><button class="btn small" data-step="${x.id}" data-state="done">Terminer</button><button class="btn small" data-step="${x.id}" data-state="pending">Réinitialiser</button></div>` : ''}</div>`,
+        `<div class="conductor-step ${x.run_state === 'current' ? 'is-current' : ''}"><p class="planning-day">${esc(WorkHours.label(x, p.event_date))}</p><div class="conductor-time">${hm(x.start_time)}${x.end_time ? ' – ' + hm(x.end_time) : ''}</div><p class="work-duration">${WorkHours.duration(x) === null ? 'Durée à compléter' : WorkHours.format(WorkHours.duration(x))}${x.end_time && x.end_time < x.start_time ? ' · fin le lendemain' : ''}</p><strong>${esc(x.title)}</strong><span class="status">${{ pending: 'À venir', current: 'En cours', done: 'Terminé' }[x.run_state || 'pending']}</span><p>${esc(x.speaker)}${x.song ? ' · ♫ ' + esc(x.song) : ''}</p><p class="pre">${esc(x.details)}</p>${x.cue ? `<p class="conductor-cue">${esc(x.cue)}</p>` : ''}${editable ? `<div class="actions no-print"><button class="btn small" data-step="${x.id}" data-state="current">Lancer</button><button class="btn small" data-step="${x.id}" data-state="done">Terminer</button><button class="btn small" data-step="${x.id}" data-state="pending">Réinitialiser</button></div>` : ''}</div>`,
     });
     // Optional end time must be SQL NULL, not an empty time literal.
     const form = $('#tool-editor-form');
@@ -472,6 +473,7 @@ const EventTools = (() => {
       submit(form, async () => {
         const key = form.elements.record_id.value;
         const values = { ...valuesOf(form, fields), project_id: p.id };
+        values.day_offset = Number(values.day_offset);
         values.end_time = values.end_time || null;
         await write(
           (key

@@ -170,6 +170,18 @@ La présentation conserve les thèmes sobres clair et sombre avec des textes plu
 
 L'outil **Conducteur** est renommé **Planning**. Ses adresses historiques `?section=conductor` restent valides. Chaque créneau affiche sa durée et le planning affiche les heures de travail planifiées. Le même calcul est repris dans **Tarification et facturation**, dans la fiche du projet, ainsi que dans son planning de préparation.
 
-Le total utilise les débuts et fins existants à la minute près. Les pauses entre créneaux sont exclues ; les chevauchements ne comptent qu'une fois. Une fin avant le début est interprétée le lendemain, sur une journée de prestation (24 heures au maximum). Les créneaux sans horaires complets ou avec des heures identiques sont signalés et exclus, jusqu'à correction. Ce total représente le temps planifié, pas un chronométrage du travail effectué.
+Le total utilise les débuts et fins existants à la minute près. Les pauses entre créneaux sont exclues ; les chevauchements ne comptent qu'une fois. Une fin avant le début est interprétée le lendemain du jour choisi. Le calcul distingue les jours : deux créneaux à la même heure sur deux jours différents sont additionnés. Les créneaux sans horaires complets ou avec des heures identiques sont signalés et exclus, jusqu'à correction. Ce total représente le temps planifié, pas un chronométrage du travail effectué.
 
 Aucune migration ni réécriture des projets : les tarifs, paiements, factures et liens existants restent inchangés. `work-hours.js` partage le calcul entre les vues ; `node tests/work-hours.cjs` contrôle les durées, minuit, chevauchements, pauses, horaires incomplets, édition/suppression, total financier et conservation des montants.
+
+## Planning sur plusieurs jours
+
+Dans les deux formulaires de planning, **Jour du créneau** propose le jour de l'événement (J), le lendemain (J+1) et les jours suivants, avec la date correspondante lorsque la date du projet est renseignée. Les jours précédents sont également disponibles. Le tri utilise d'abord ce jour, puis l'heure, dans le Planning, la préparation, l'impression et les liens partagés autorisant le planning. Une fin antérieure au début reste une fin après minuit.
+
+Exemple : installation J de 11 h 50 à 13 h, puis rangement J+1 de 10 h à 12 h : le rangement apparaît après l'installation et le total est de 3 h 10. Les mêmes horaires sur des jours différents ne se recouvrent plus dans le calcul des heures. Les chevauchements réels à cheval sur minuit sont toujours fusionnés.
+
+La migration `add_explicit_planning_days`, enregistrée dans `db/planning-days.sql`, ajoute `schedule_items.day_offset` (−7 à +30, nullable). Elle ne devine pas les jours des anciens créneaux : ils restent inchangés et affichent « jour à confirmer ». Les sélectionner dans **Modifier**, puis choisir le jour approprié. Tant que tous les créneaux sont anciens, l'ancien total sur une journée reste conservé ; dès qu'un jour est confirmé, les jours non précisés sont provisoirement placés à J et le total reste signalé à confirmer.
+
+Les jetons et rubriques des liens, montants et factures ne changent pas. Les réponses publiques existantes restent identiques à l'installation ; seules les lignes dont le jour est confirmé reçoivent le jour dans le planning public. La migration vérifie ces conservations. Pour une autre base, appliquer ce script après les migrations existantes, avant la publication des fichiers statiques.
+
+Validation : `node tests/planning-days.cjs` (deux formulaires, tri, modification, heures, affichage public et mobile), `tests/planning-days.sql` (droits, bornes, projection et tri publics, transaction annulée), et les suites de régression existantes.
