@@ -239,7 +239,7 @@ Nouveaux onglets dans les outils du projet :
 
 ### Setup et câbles de mon matériel
 
-Dans **Mon matériel → Connectique audio**, définir les prises de chaque appareil : nom, entrée/sortie, connecteur illustré, prise mâle/femelle et niveau/protocole. Le choix se fait dans une fenêtre avec recherche et 35 formes de connectiques, dont les borniers HP à vis/pince et Euroblock/Phoenix. Le format audio est renseigné automatiquement ; les anciens ports gardent leurs paramètres. Deux prises gauche/droite restent deux ports distincts. Les signaux ligne et puissance haut-parleur sont distincts.
+Dans **Mon matériel → Connectique audio**, définir les prises de chaque appareil : nom, entrée/sortie, connecteur illustré, prise mâle/femelle et niveau/protocole. Le choix se fait dans une fenêtre avec recherche et 36 formes de connectiques, dont les borniers HP à vis/pince et Euroblock/Phoenix. Le format audio est renseigné automatiquement ; les anciens ports gardent leurs paramètres. Deux prises gauche/droite restent deux ports distincts. Les signaux ligne et puissance haut-parleur sont distincts.
 
 Sélectionner les exemplaires dans le matériel du projet, puis ouvrir **Setup et câbles**. Placer les appareils et des zones nommées (petite, moyenne ou grande, déplaçables directement), définir les dimensions physiques, puis relier les sorties aux entrées. La proposition automatique ne relie que les correspondances uniques des deux côtés ; les choix ambigus restent manuels. Les ports déjà utilisés, signaux/canaux incompatibles et boucles sont refusés par l'éditeur. Le serveur contrôle aussi les niveaux/protocoles, la quantité sélectionnée, les ports et les révisions. Une conversion optique/coaxiale ou de niveau audio demande un convertisseur avec ses propres ports.
 
@@ -268,3 +268,14 @@ Déployer `supabase/functions/create-team-user/index.ts` sous le nom `create-tea
 `node tests/production-ui.cjs` couvre la connectique, deux câbles stéréo, plans/SVG/impressions/brouillons, placement/capacité, RSVP/fermeture, marge, CSV, équipe et mobile. `node tests/audio-routing.cjs` vérifie le calcul des câbles et les incompatibilités ; `node tests/team-account-edge.cjs` vérifie l'authentification administrateur, le rôle imposé et le nettoyage d'une création incomplète, sans créer de compte réel. Les suites historiques restent applicables.
 
 La mise à jour du catalogue illustré utilise `db/connector-catalog.sql` après les migrations précédentes. Elle étend la validation sans réécrire les ports ou snapshots existants. `node tests/connector-picker.cjs` couvre la fenêtre, les dessins, la recherche, les brouillons, le mobile et les tailles simples de zone ; `tests/connector-catalog.sql` vérifie les nouvelles familles en transaction annulée.
+
+
+### Prises hybrides et groupes audio
+
+Une prise physique peut proposer plusieurs fiches et niveaux de signal dans `alternatives` : identifiant stable, connecteur, sexe, signal et format interne. La fiche principale historique reste disponible ; une liaison sans identifiant de variante continue d’utiliser cette fiche. Les variantes d’une prise partagent son occupation, même si leur connectique ou leur signal diffèrent. Les câbles et les contrôles utilisent la variante explicitement choisie, jamais une conversion implicite de niveau.
+
+Dans **Connectique audio**, choisir **Combo XLR / Jack 6,35** ou ajouter librement des possibilités à une prise. Chaque possibilité peut avoir son signal et son sexe propres. Un groupe / repère libre et les rôles L/Mono, L, R ou stéréo sur une seule prise distinguent une paire physique d’une prise stéréo. Le bouton **Ajouter une paire L/Mono–R** crée deux prises distinctes. Les repères mono/stéréo ne changent pas la capacité des autres prises et ne forcent pas le branchement du côté R.
+
+Le modèle **Yamaha MG06X** ajoute volontairement 11 prises physiques (2 combos MIC/LINE, CH 3/4, CH 5/6, 4 sorties stéréo XLR/jack, casque stéréo). Il complète sans écraser les prises existantes et ignore les noms/sens déjà présents. Les réglages PAD, gain, alimentation fantôme et MONO/STEREO restent physiques et doivent être vérifiés sur la console. Le modèle est un point de départ entièrement modifiable.
+
+Appliquer `db/audio-socket-alternatives.sql` après `db/connector-catalog.sql`. La migration ajoute trois champs et valide les variantes côté serveur sans réécrire les anciens setups. `node tests/audio-sockets.cjs`, `node tests/audio-sockets-ui.cjs` et `tests/audio-sockets.sql` couvrent les prises combo, la fiche retenue, l’occupation physique unique, les groupes L/Mono–R, les brouillons, les anciens formats et la validation serveur.

@@ -29,11 +29,11 @@ const { mock, pid, sourceId } = require("./production-mock.cjs");
     await page.locator("#choose-audio-connector").click();
     assert.equal(
       await page.locator("#connector-picker .connector-card").count(),
-      35,
+      36,
     );
     assert.equal(
       await page.locator("#connector-picker .connector-card svg").count(),
-      35,
+      36,
     );
     await page.locator("#connector-picker input").fill("cuivre");
     assert.equal(
@@ -130,7 +130,7 @@ const { mock, pid, sourceId } = require("./production-mock.cjs");
     assert.equal(saved.x, 11);
     assert.deepEqual(errors, []);
     console.log(
-      "PASS: 35 illustrated choices, search, stripped-wire defaults, hidden automatic formats, draft/edit/reset, mobile popup, Escape and draggable preset zones",
+      "PASS: 36 illustrated choices, search, stripped-wire defaults, hidden automatic formats, draft/edit/reset, mobile popup, Escape and draggable preset zones",
     );
   } finally {
     await browser.close();

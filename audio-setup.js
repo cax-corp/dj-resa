@@ -12,13 +12,22 @@ const AudioSetup = (() => {
     avb: "AVB",
     usb: "USB audio",
   };
-  function endpoint(board, nodeId, portId) {
+  function endpoint(board, nodeId, portId, variantId) {
     const node = board.nodes.find((n) => n.id === nodeId);
-    return { node, port: node?.ports.find((p) => p.id === portId) };
+    const physical = node?.ports.find((p) => p.id === portId);
+    return {
+      node,
+      port: physical ? AudioPorts.resolve(physical, variantId) : null,
+    };
   }
   function compatible(board, edge, ignoreId) {
-    const from = endpoint(board, edge.from_node, edge.from_port),
-      to = endpoint(board, edge.to_node, edge.to_port);
+    const from = endpoint(
+        board,
+        edge.from_node,
+        edge.from_port,
+        edge.from_variant,
+      ),
+      to = endpoint(board, edge.to_node, edge.to_port, edge.to_variant);
     if (!from.port || !to.port)
       throw new Error("Sélectionnez une sortie et une entrée existantes.");
     if (from.node.id === to.node.id)
@@ -174,12 +183,99 @@ const AudioSetup = (() => {
       const ports = await Production.list("equipment_audio_ports", {
         equipment_id: equipmentId,
       });
-      dialog.innerHTML = `<div class="tool-toolbar"><h2>Connectique · ${esc(gear.name)}</h2><button type="button" class="btn" id="close-audio-catalog">Fermer</button></div><p class="tool-note">Décrivez les prises physiques de votre appareil. Pour deux prises gauche / droite, créez deux ports distincts. Cliquez sur le dessin pour choisir la connectique. Les setups déjà enregistrés conservent leur copie de ces prises.</p><form id="audio-ports-${equipmentId}" class="stack"><input name="record_id" type="hidden"><div class="row-2"><label>Nom du port<input name="name" required maxlength="100" placeholder="Master gauche"></label><label>Sens<select name="direction">${Production.options({ in: "Entrée", out: "Sortie" })}</select></label><div class="connector-field"><span>Connectique</span><input name="connector" type="hidden" value="xlr3"><input name="channels" type="hidden" value="1"><button type="button" class="btn connector-choice" id="choose-audio-connector" aria-haspopup="dialog"></button></div><label>Prise de l’appareil<select name="gender">${Production.options({ female: "Femelle", male: "Mâle", none: "Non applicable" })}</select></label><label>Signal<select name="signal">${Production.options(signals, "line")}</select></label></div><div class="actions"><button class="btn primary">Enregistrer le port</button><button type="button" class="btn" id="new-audio-port">Nouveau port</button></div></form><div class="tool-list">${ports.map((p) => `<article class="card tool-row"><div><strong>${esc(p.name)}</strong><p>${p.direction === "out" ? "Sortie" : "Entrée"} · ${connectors[p.connector]} · ${signals[p.signal]} · ${p.gender === "male" ? "Mâle" : p.gender === "female" ? "Femelle" : "Sans fiche mâle/femelle"}</p></div><div class="actions"><button class="btn small" data-port-edit="${p.id}">Modifier le port</button><button class="btn small danger" data-port-remove="${p.id}">Supprimer le port</button></div></article>`).join("") || '<p class="empty">Aucun port renseigné.</p>'}</div>`;
+      dialog.innerHTML = `<div class="tool-toolbar"><h2>Connectique · ${esc(gear.name)}</h2><button type="button" class="btn" id="close-audio-catalog">Fermer</button></div><p class="tool-note">Décrivez les prises physiques de votre appareil. Pour deux prises gauche / droite, créez deux ports distincts. Cliquez sur le dessin pour choisir la connectique. Les setups déjà enregistrés conservent leur copie de ces prises.</p><form id="audio-ports-${equipmentId}" class="stack"><input name="record_id" type="hidden"><div class="row-2"><label>Nom du port<input name="name" required maxlength="100" placeholder="Master gauche"></label><label>Sens<select name="direction">${Production.options({ in: "Entrée", out: "Sortie" })}</select></label><div class="connector-field"><span>Connectique</span><input name="connector" type="hidden" value="xlr3"><input name="channels" type="hidden" value="1"><button type="button" class="btn connector-choice" id="choose-audio-connector" aria-haspopup="dialog"></button></div><label>Prise de l’appareil<select name="gender">${Production.options({ female: "Femelle", male: "Mâle", none: "Non applicable" })}</select></label><label>Signal<select name="signal">${Production.options(signals, "line")}</select></label><label>Groupe / repère (facultatif)<input name="group_name" maxlength="100" placeholder="CH 3 / 4, AUX, Master…"></label><label>Repère audio<select name="audio_role">${Production.options(AudioPorts.roles, "independent")}</select></label></div><input name="alternatives" type="hidden" value="[]"><section class="audio-alternatives"><h3>Autres fiches acceptées sur cette même prise</h3><p class="tool-note">Pour une prise combo ou plusieurs niveaux acceptés : ajoutez les possibilités ici. Une seule fiche pourra y être branchée à la fois. Pour deux prises L/R distinctes, utilisez « Ajouter une paire L/Mono–R » ci-dessous.</p><div id="audio-alternatives-list"></div><button type="button" class="btn small" id="add-audio-alternative">Ajouter une possibilité sur cette prise</button></section><div class="actions"><button class="btn primary">Enregistrer le port</button><button type="button" class="btn" id="new-audio-port">Nouveau port</button></div></form><section class="card audio-helpers"><h3>Ajouter rapidement des prises</h3><div class="actions"><button type="button" class="btn" id="add-stereo-pair">Ajouter une paire L/Mono–R</button><button type="button" class="btn" id="add-mg06x">Ajouter le modèle Yamaha MG06X</button></div><p class="tool-note">Les ajouts complètent la liste sans remplacer vos prises. Modèle MG06X : 2 combos MIC/LINE, entrées 3/4 et 5/6, sorties stéréo XLR et jack, casque. Vérifiez les réglages MIC/LINE, PAD, MONO/STEREO et le manuel avant branchement.</p></section><div class="tool-list">${
+        ports
+          .map(
+            (p) =>
+              `<article class="card tool-row"><div><strong>${esc(p.name)}</strong><p>${p.direction === "out" ? "Sortie" : "Entrée"} · ${AudioPorts.variants(
+                p,
+              )
+                .map(
+                  (v) =>
+                    esc(connectors[v.connector]) +
+                    " · " +
+                    esc(signals[v.signal]),
+                )
+                .join(
+                  " / ",
+                )} ${p.group_name ? " · " + esc(p.group_name) : ""} ${p.audio_role && p.audio_role !== "independent" ? " · " + esc(AudioPorts.roles[p.audio_role]) : ""} · ${p.gender === "male" ? "Mâle" : p.gender === "female" ? "Femelle" : "Sans fiche mâle/femelle"}</p></div><div class="actions"><button class="btn small" data-port-edit="${p.id}">Modifier le port</button><button class="btn small danger" data-port-remove="${p.id}">Supprimer le port</button></div></article>`,
+          )
+          .join("") || '<p class="empty">Aucun port renseigné.</p>'
+      }</div>`;
       $("#close-audio-catalog").onclick = () => dialog.close();
       const form = dialog.querySelector("form");
       const choice = dialog.querySelector("#choose-audio-connector");
+      function alternatives() {
+        return JSON.parse(form.elements.alternatives.value || "[]");
+      }
+      function saveAlternatives(items) {
+        form.elements.alternatives.value = JSON.stringify(items);
+        form.elements.alternatives.dispatchEvent(
+          new Event("change", { bubbles: true }),
+        );
+        refreshChoice();
+      }
+      function renderAlternatives() {
+        const list = dialog.querySelector("#audio-alternatives-list");
+        list.innerHTML =
+          alternatives()
+            .map(
+              (v) =>
+                `<div class="audio-alternative" data-variant="${esc(v.id)}">${AudioConnectors.icon(v.connector)}<strong>${esc(connectors[v.connector])}</strong><label>Signal<select data-alt-signal>${Production.options(signals, v.signal)}</select></label><label>Prise<select data-alt-gender>${Production.options({ female: "Femelle", male: "Mâle", none: "Non applicable" }, v.gender)}</select></label><button type="button" class="btn small danger" data-alt-remove>Retirer</button></div>`,
+            )
+            .join("") ||
+          '<p class="muted">Une seule fiche acceptée pour le moment.</p>';
+        list.querySelectorAll("[data-variant]").forEach((row) => {
+          const update = (key, value) => {
+            const items = alternatives();
+            items.find((v) => v.id === row.dataset.variant)[key] = value;
+            saveAlternatives(items);
+          };
+          row.querySelector("[data-alt-signal]").onchange = (e) =>
+            update("signal", e.target.value);
+          row.querySelector("[data-alt-gender]").onchange = (e) =>
+            update("gender", e.target.value);
+          row.querySelector("[data-alt-remove]").onclick = () =>
+            saveAlternatives(
+              alternatives().filter((v) => v.id !== row.dataset.variant),
+            );
+        });
+      }
+      dialog.querySelector("#add-audio-alternative").onclick = () => {
+        if (alternatives().length >= 8)
+          return ERR(
+            new Error("Limite de 8 possibilités supplémentaires par prise."),
+          );
+        AudioConnectors.choose("", (id) => {
+          if (id === "combo_xlr_jack")
+            return ERR(
+              new Error(
+                "Choisissez la fiche précise à ajouter (XLR, jack TS ou TRS).",
+              ),
+            );
+          saveAlternatives([
+            ...alternatives(),
+            {
+              id: crypto.randomUUID(),
+              connector: id,
+              signal: form.elements.signal.value,
+              gender: AudioConnectors.terminals.includes(id)
+                ? "none"
+                : form.elements.gender.value,
+              channels: Number(form.elements.channels.value),
+            },
+          ]);
+        });
+      };
       function refreshChoice() {
-        const id = form.elements.connector.value;
+        const physical = form.elements.connector.value;
+        const id =
+          physical === "xlr3" &&
+          alternatives().some((v) =>
+            ["jack_ts", "jack_trs"].includes(v.connector),
+          )
+            ? "combo_xlr_jack"
+            : physical;
         choice.innerHTML =
           AudioConnectors.icon(id) +
           "<span>" +
@@ -188,11 +284,32 @@ const AudioSetup = (() => {
         const terminal = AudioConnectors.terminals.includes(id);
         form.elements.gender.closest("label").hidden = terminal;
         if (terminal) form.elements.gender.value = "none";
+        renderAlternatives();
       }
       choice.onclick = () =>
         AudioConnectors.choose(form.elements.connector.value, (id) => {
+          if (id === "combo_xlr_jack") {
+            form.elements.connector.value = "xlr3";
+            form.elements.signal.value = "mic";
+            form.elements.channels.value = 1;
+            form.elements.gender.value = "female";
+            form.elements.audio_role.value = "independent";
+            saveAlternatives(AudioPorts.combo());
+            refreshChoice();
+            form.elements.connector.dispatchEvent(
+              new Event("change", { bubbles: true }),
+            );
+            return;
+          }
           form.elements.connector.value = id;
-          form.elements.channels.value = AudioConnectors.count(id);
+          form.elements.channels.value =
+            form.elements.audio_role.value === "stereo"
+              ? 2
+              : ["left", "right", "left_mono"].includes(
+                    form.elements.audio_role.value,
+                  )
+                ? 1
+                : AudioConnectors.count(id);
           form.elements.gender.value = AudioConnectors.terminals.includes(id)
             ? "none"
             : "female";
@@ -222,9 +339,23 @@ const AudioSetup = (() => {
         });
       Drafts.restore(form);
       refreshChoice();
+      form.elements.audio_role.onchange = () => {
+        const role = form.elements.audio_role.value;
+        const count =
+          role === "stereo"
+            ? 2
+            : role === "independent"
+              ? AudioConnectors.count(form.elements.connector.value)
+              : 1;
+        form.elements.channels.value = count;
+        saveAlternatives(
+          alternatives().map((v) => ({ ...v, channels: count })),
+        );
+      };
       Production.submit(form, async (f) => {
         const { record_id, ...values } = Object.fromEntries(new FormData(f));
         values.channels = Number(values.channels);
+        values.alternatives = JSON.parse(values.alternatives || "[]");
         const query = record_id
           ? sb
               .from("equipment_audio_ports")
@@ -245,7 +376,74 @@ const AudioSetup = (() => {
         form.elements.record_id.value = "";
         form.elements.connector.value = "xlr3";
         form.elements.channels.value = 1;
+        form.elements.alternatives.value = "[]";
         refreshChoice();
+      };
+      async function addMissing(candidates) {
+        const missing = candidates.filter(
+          (c) =>
+            !ports.some(
+              (p) => p.name === c.name && p.direction === c.direction,
+            ),
+        );
+        if (!missing.length) return toast("Ces prises existent déjà.");
+        await Production.write(
+          sb
+            .from("equipment_audio_ports")
+            .insert(missing.map((c) => ({ ...c, equipment_id: equipmentId }))),
+        );
+        toast(`${missing.length} prise(s) ajoutée(s)`);
+        await render();
+      }
+      Production.buttons("#add-mg06x", async () => {
+        if (
+          !confirm(
+            "Ajouter les prises du modèle Yamaha MG06X ? Vos prises existantes seront conservées.",
+          )
+        )
+          return;
+        await addMissing(AudioPorts.mg06x());
+      });
+      dialog.querySelector("#add-stereo-pair").onclick = () => {
+        const popup = document.createElement("dialog");
+        popup.className = "audio-dialog";
+        popup.id = "stereo-pair-dialog";
+        popup.setAttribute("aria-label", "Ajouter une paire L/Mono–R");
+        popup.innerHTML = `<h2>Ajouter une paire L/Mono–R</h2><p>Deux prises physiques indépendantes dans un même groupe.</p><form class="stack"><label>Nom du groupe<input name="group" required maxlength="80" placeholder="CH 3 / 4"></label><label>Sens<select name="direction">${Production.options({ in: "Entrées", out: "Sorties" })}</select></label><label>Type de paire<select name="kind"><option value="left_mono">L/Mono + R</option><option value="left">L + R</option></select></label><p>La paire reprend la connectique et le signal choisis dans le formulaire principal.</p><div class="actions"><button class="btn primary">Ajouter les deux prises</button><button type="button" class="btn" data-cancel-pair>Annuler</button></div></form>`;
+        app.append(popup);
+        popup.showModal();
+        popup.querySelector("[data-cancel-pair]").onclick = () => popup.close();
+        popup.addEventListener("close", () => popup.remove(), { once: true });
+        Production.submit(popup.querySelector("form"), async (f) => {
+          const group = f.elements.group.value.trim(),
+            direction = f.elements.direction.value;
+          if (!group) throw new Error("Donnez un nom au groupe.");
+          const spec = {
+            direction,
+            connector: form.elements.connector.value,
+            signal: form.elements.signal.value,
+            gender: form.elements.gender.value,
+            channels: 1,
+            alternatives: alternatives().map((v) => ({
+              ...v,
+              id: crypto.randomUUID(),
+              channels: 1,
+            })),
+            group_name: group,
+          };
+          await addMissing([
+            {
+              ...spec,
+              name:
+                group +
+                " · " +
+                (f.elements.kind.value === "left_mono" ? "L / Mono" : "L"),
+              audio_role: f.elements.kind.value,
+            },
+            { ...spec, name: group + " · R", audio_role: "right" },
+          ]);
+          popup.close();
+        });
       };
       Production.buttons(
         "[data-port-edit]",
@@ -260,6 +458,11 @@ const AudioSetup = (() => {
             "channels",
           ])
             form.elements[key].value = port[key];
+          form.elements.group_name.value = port.group_name || "";
+          form.elements.audio_role.value = port.audio_role || "independent";
+          form.elements.alternatives.value = JSON.stringify(
+            port.alternatives || [],
+          );
           form.elements.record_id.value = port.id;
           refreshChoice();
           form.elements.record_id.dispatchEvent(
@@ -329,7 +532,7 @@ const AudioSetup = (() => {
       ports
         .filter((port) => port.equipment_id === id)
         .map(
-          ({ id, name, direction, connector, gender, signal, channels }) => ({
+          ({
             id,
             name,
             direction,
@@ -337,6 +540,20 @@ const AudioSetup = (() => {
             gender,
             signal,
             channels,
+            alternatives,
+            group_name,
+            audio_role,
+          }) => ({
+            id,
+            name,
+            direction,
+            connector,
+            gender,
+            signal,
+            channels,
+            alternatives: alternatives || [],
+            group_name: group_name || "",
+            audio_role: audio_role || "independent",
           }),
         );
     function remember() {
@@ -389,9 +606,11 @@ const AudioSetup = (() => {
                         : e.to_node === n.id && e.to_port === port.id,
                     ),
                 )
-                .map(
-                  (port) =>
-                    `<option value="${n.id}|${port.id}">${esc(n.label)} · ${esc(port.name)} · ${signals[port.signal]}</option>`,
+                .flatMap((port) =>
+                  AudioPorts.variants(port).map(
+                    (v) =>
+                      `<option value="${n.id}|${port.id}${v.id === "primary" ? "" : "|" + v.id}">${esc(n.label)} · ${esc(port.name)} · ${esc(connectors[v.connector])} · ${esc(signals[v.signal])}</option>`,
+                  ),
                 ),
             )
             .join("");
@@ -454,6 +673,12 @@ const AudioSetup = (() => {
             `<p class="warn-text">${esc(n.label)} : ${!n.ports.length ? "connectique à renseigner ou actualiser" : "aucune liaison définie"}.</p>`,
         )
         .join("");
+      $("#setup-alerts").insertAdjacentHTML(
+        "beforeend",
+        AudioPorts.groupNotes(state)
+          .map((note) => `<p class="tool-note">${esc(note)}</p>`)
+          .join(""),
+      );
       if (nodeForm) {
         const n = state.nodes.find((n) => n.id === selected);
         for (const key of ["label", "x", "y"])
@@ -668,14 +893,17 @@ const AudioSetup = (() => {
       remember();
     });
     Production.submit(wireForm, async (f) => {
-      const [from_node, from_port] = f.elements.from.value.split("|"),
-        [to_node, to_port] = f.elements.to.value.split("|");
+      const [from_node, from_port, from_variant] =
+          f.elements.from.value.split("|"),
+        [to_node, to_port, to_variant] = f.elements.to.value.split("|");
       const edge = {
         id: crypto.randomUUID(),
         from_node,
         from_port,
         to_node,
         to_port,
+        from_variant: from_variant || "primary",
+        to_variant: to_variant || "primary",
         length: Number(f.elements.cable_length.value),
       };
       compatible(state, edge);
@@ -686,52 +914,63 @@ const AudioSetup = (() => {
     });
     Production.buttons("#suggest-wires", () => {
       let added = 0;
-      for (const n of state.nodes)
-        for (const input of n.ports.filter((p) => p.direction === "in")) {
+      for (const node of state.nodes)
+        for (const input of node.ports.filter((p) => p.direction === "in")) {
           if (
             state.edges.some(
-              (e) => e.to_node === n.id && e.to_port === input.id,
+              (e) => e.to_node === node.id && e.to_port === input.id,
             )
           )
             continue;
           const candidates = [];
-          for (const src of state.nodes)
-            for (const out of src.ports.filter(
-              (p) => p.direction === "out" && p.connector === input.connector,
-            )) {
-              const edge = {
-                id: crypto.randomUUID(),
-                from_node: src.id,
-                from_port: out.id,
-                to_node: n.id,
-                to_port: input.id,
-                length: 0,
-              };
-              try {
-                compatible(state, edge);
-                candidates.push(edge);
-              } catch {}
-            }
-          if (candidates.length === 1) {
-            const candidate = candidates[0];
-            let destinations = 0;
-            for (const other of state.nodes)
-              for (const port of other.ports.filter(
-                (p) => p.direction === "in" && p.connector === input.connector,
-              )) {
+          for (const accepted of AudioPorts.variants(input))
+            for (const source of state.nodes)
+              for (const output of source.ports.filter(
+                (p) => p.direction === "out",
+              ))
+                for (const plug of AudioPorts.variants(output)) {
+                  if (plug.connector !== accepted.connector) continue;
+                  const edge = {
+                    id: crypto.randomUUID(),
+                    from_node: source.id,
+                    from_port: output.id,
+                    from_variant: plug.id,
+                    to_node: node.id,
+                    to_port: input.id,
+                    to_variant: accepted.id,
+                    length: 0,
+                  };
+                  try {
+                    compatible(state, edge);
+                    candidates.push(edge);
+                  } catch {}
+                }
+          if (candidates.length !== 1) continue;
+          const candidate = candidates[0],
+            source = endpoint(
+              state,
+              candidate.from_node,
+              candidate.from_port,
+              candidate.from_variant,
+            );
+          let destinations = 0;
+          for (const other of state.nodes)
+            for (const port of other.ports.filter((p) => p.direction === "in"))
+              for (const option of AudioPorts.variants(port)) {
+                if (option.connector !== source.port.connector) continue;
                 try {
                   compatible(state, {
                     ...candidate,
                     to_node: other.id,
                     to_port: port.id,
+                    to_variant: option.id,
                   });
                   destinations++;
                 } catch {}
               }
-            if (destinations === 1) {
-              state.edges.push(candidate);
-              added++;
-            }
+          if (destinations === 1) {
+            state.edges.push(candidate);
+            added++;
           }
         }
       selectors();

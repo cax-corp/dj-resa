@@ -3,6 +3,13 @@ const AudioConnectors = (() => {
   // id, label, family, silhouette, helpful description, automatic format size
   const items = [
     [
+      "combo_xlr_jack",
+      "Combo XLR / Jack 6,35",
+      "Prises hybrides",
+      "combo",
+      "Une seule prise acceptant une fiche XLR ou jack TS / TRS",
+    ],
+    [
       "xlr3",
       "XLR 3 broches",
       "XLR et mini-XLR",
@@ -264,7 +271,13 @@ const AudioConnectors = (() => {
         );
       }).join("");
     let drawing;
-    if (/^(pins|mini|din)\d/.test(shape))
+    if (shape === "combo")
+      drawing =
+        '<circle cx="48" cy="32" r="25"/><circle cx="48" cy="32" r="8"/><path d="M42 5h12v5H42zM30 30h7v4h-7zm29 0h7v4h-7z"/>' +
+        circle(37, 19, 3) +
+        circle(59, 19, 3) +
+        circle(48, 48, 3);
+    else if (/^(pins|mini|din)\d/.test(shape))
       drawing = pins(Number(shape.match(/\d/)[0]), shape.startsWith("mini"));
     else if (/^(jack|small|tiny)\d/.test(shape)) {
       const n = Number(shape.match(/\d/)[0]);

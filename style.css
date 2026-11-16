@@ -1404,3 +1404,10 @@ body.is-loading .route-progress { display: block; }
 .connector-choice svg { width: 72px; height: 48px; flex-shrink: 0; }
 .connector-choice .muted { margin-left: auto; font-size: 12px; }
 @media (max-width: 520px) { .connector-dialog { padding: 16px; } .connector-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .connector-card { padding: 12px 8px; } .connector-card strong { font-size: 13px; } }
+
+.audio-alternatives { border: 1px solid var(--border); padding: 16px; border-radius: 6px; }
+.audio-alternative { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; padding: 12px 0; border-top: 1px solid var(--border); }
+.audio-alternative svg { width: 64px; height: 44px; flex: 0 0 auto; }
+.audio-alternative label { flex: 1; min-width: 130px; }
+.audio-alternative strong { min-width: 130px; }
+.audio-helpers { margin-top: 20px; }

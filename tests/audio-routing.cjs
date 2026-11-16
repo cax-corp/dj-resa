@@ -2,7 +2,9 @@ const assert = require("node:assert/strict"),
   fs = require("node:fs"),
   vm = require("node:vm");
 const audio = vm.runInNewContext(
-  fs.readFileSync(__dirname + "/../connector-picker.js", "utf8") +
+  fs.readFileSync(__dirname + "/../audio-ports.js", "utf8") +
+    "\n" +
+    fs.readFileSync(__dirname + "/../connector-picker.js", "utf8") +
     "\n" +
     fs.readFileSync(__dirname + "/../audio-setup.js", "utf8") +
     "\nAudioSetup",
