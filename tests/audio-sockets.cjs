@@ -84,3 +84,8 @@ assert.match(ports.groupNotes(board).join(" "), /seule l’entrée R/);
 console.log(
   "PASS: MG06X physical sockets, mic/line combo options, exact cable ends, shared socket occupancy, unknown variants, stereo/mono and independent L/R",
 );
+
+assert.equal(ports.groups(preset).length, 4);
+assert.equal(ports.groups(preset).filter(g=>g.mono).length, 2);
+const ambiguous = [{...preset[2],id:'left1'}, {...preset[2],id:'left2'}, {...preset[3],id:'right'}];
+assert.equal(ports.groups(ambiguous).length, 0, 'Ambiguous legacy labels must not invent physical groups');

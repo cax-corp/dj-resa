@@ -1420,3 +1420,20 @@ body.is-loading .route-progress { display: block; }
 #stereo-cable-dialog [data-manual]:not([hidden]) { display: grid; gap: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 6px; }
 #audio-model-search [data-model-results] { display: grid; gap: 10px; margin-top: 16px; }
 .audio-model-launch { margin: 18px 0 24px; }
+
+.audio-group-section { margin: 24px 0; }
+.audio-group-grid, .setup-group-states { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); gap: 14px; }
+.audio-port-group { padding: 18px; }
+.audio-group-sockets { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; }
+.audio-group-sockets > div { display: grid; justify-items: center; gap: 6px; padding: 14px; text-align: center; min-width: 0; overflow-wrap: anywhere; }
+.audio-group-sockets > div + div { border-left: 1px solid var(--border); }
+.audio-group-sockets svg { width: 86px; height: 58px; }
+.audio-group-sockets small, .audio-group-behavior { color: var(--text-light); }
+.audio-group-check { display: flex; align-items: flex-start; gap: 10px; }
+.audio-group-check input { width: auto; flex-shrink: 0; margin-top: 4px; }
+.audio-individual-editor { margin: 20px 0; padding: 16px; border: 1px solid var(--border); border-radius: 6px; }
+.audio-individual-editor > summary { font-weight: 600; cursor: pointer; margin-bottom: 14px; }
+.setup-group-states { margin: 16px 0; }
+.setup-group-state { display: grid; gap: 6px; padding: 14px; }
+.setup-group-state span { font-weight: 600; }
+.setup-group-state small { color: var(--text-light); }

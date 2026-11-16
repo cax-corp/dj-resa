@@ -1,0 +1,5 @@
+const base = require("./production-mock.cjs");
+const mock =
+  base.mock +
+  `\nconst groupCreate=window.supabase.createClient;window.supabase.createClient=(...args)=>{const client=groupCreate(...args),rpc=client.rpc;client.rpc=async(name,params)=>{if(!['set_equipment_stereo_group','clear_equipment_stereo_group'].includes(name))return rpc(name,params);const db=window.testState.db,ports=db.equipment_audio_ports;window.testState.calls.push({rpc:name,args:params});const l=ports.find(p=>p.id===params.left_id&&p.equipment_id===params.gear_id),r=ports.find(p=>p.id===params.right_id&&p.equipment_id===params.gear_id);if(!l||!r||l.id===r.id||l.direction!==r.direction)return {data:null,error:{message:'Invalid group'}};if(name==='set_equipment_stereo_group'){l.group_name=r.group_name=params.group_label;l.audio_role=params.mono_when_right_empty?'left_mono':'left';r.audio_role='right';}else{l.group_name=r.group_name='';l.audio_role=r.audio_role='independent';}return {data:null,error:null};};return client;};`;
+module.exports = { ...base, mock };

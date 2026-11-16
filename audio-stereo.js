@@ -101,49 +101,43 @@ const AudioStereo = (() => {
                 " · " +
                 AudioConnectors.labels[v.connector],
             });
-      const groups = [
-        ...new Set(free.filter((p) => p.group_name).map((p) => p.group_name)),
-      ];
-      for (const group of groups) {
-        const lefts = free.filter(
-            (p) =>
-              p.group_name === group &&
-              ["left", "left_mono"].includes(p.audio_role),
-          ),
-          rights = free.filter(
-            (p) => p.group_name === group && p.audio_role === "right",
-          );
-        for (const l of lefts)
-          for (const r of rights)
-            for (const lv of AudioPorts.variants(l))
-              for (const rv of AudioPorts.variants(r)) {
-                if (
-                  lv.signal !== "line" ||
-                  rv.signal !== "line" ||
-                  Number(lv.channels) !== 1 ||
-                  Number(rv.channels) !== 1
-                )
-                  continue;
-                result.push({
-                  node: node.id,
-                  port: l.id,
-                  variant: lv.id,
-                  right_port: r.id,
-                  right_variant: rv.id,
-                  label:
-                    node.label +
-                    " · " +
-                    group +
-                    " · L → " +
-                    l.name +
-                    " / R → " +
-                    r.name +
-                    " · " +
-                    AudioConnectors.labels[lv.connector] +
-                    " / " +
-                    AudioConnectors.labels[rv.connector],
-                });
-              }
+      for (const group of AudioPorts.groups(node.ports).filter(
+        (g) =>
+          g.direction === direction &&
+          free.some((p) => p.id === g.left.id) &&
+          free.some((p) => p.id === g.right.id),
+      )) {
+        const l = group.left,
+          r = group.right;
+        for (const lv of AudioPorts.variants(l))
+          for (const rv of AudioPorts.variants(r)) {
+            if (
+              lv.signal !== "line" ||
+              rv.signal !== "line" ||
+              Number(lv.channels) !== 1 ||
+              Number(rv.channels) !== 1
+            )
+              continue;
+            result.push({
+              node: node.id,
+              port: l.id,
+              variant: lv.id,
+              right_port: r.id,
+              right_variant: rv.id,
+              label:
+                node.label +
+                " · " +
+                group.name +
+                " · L → " +
+                l.name +
+                " / R → " +
+                r.name +
+                " · " +
+                AudioConnectors.labels[lv.connector] +
+                " / " +
+                AudioConnectors.labels[rv.connector],
+            });
+          }
       }
     }
     return result;

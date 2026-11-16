@@ -98,6 +98,36 @@ const AudioPorts = (() => {
       }),
     ];
   }
+  function groups(ports) {
+    const grouped = new Map();
+    for (const port of ports) {
+      if (
+        !port.group_name ||
+        !["left", "left_mono", "right"].includes(port.audio_role)
+      )
+        continue;
+      const key = port.direction + "|" + port.group_name;
+      if (!grouped.has(key))
+        grouped.set(key, {
+          name: port.group_name,
+          direction: port.direction,
+          lefts: [],
+          rights: [],
+        });
+      grouped
+        .get(key)
+        [port.audio_role === "right" ? "rights" : "lefts"].push(port);
+    }
+    return [...grouped.values()]
+      .filter((g) => g.lefts.length === 1 && g.rights.length === 1)
+      .map((g) => ({
+        name: g.name,
+        direction: g.direction,
+        left: g.lefts[0],
+        right: g.rights[0],
+        mono: g.direction === "in" && g.lefts[0].audio_role === "left_mono",
+      }));
+  }
   function groupNotes(board) {
     const notes = [];
     for (const node of board.nodes) {
@@ -136,5 +166,5 @@ const AudioPorts = (() => {
     }
     return notes;
   }
-  return { roles, variants, resolve, combo, mg06x, groupNotes };
+  return { roles, variants, resolve, combo, mg06x, groups, groupNotes };
 })();
