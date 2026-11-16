@@ -2,7 +2,7 @@ const assert = require("node:assert/strict"),
   fs = require("node:fs"),
   vm = require("node:vm");
 const { ports, audio } = vm.runInNewContext(
-  ["audio-ports.js", "connector-picker.js", "audio-setup.js"]
+  ["audio-ports.js", "connector-picker.js", "audio-stereo.js", "audio-setup.js"]
     .map((f) => fs.readFileSync(__dirname + "/../" + f, "utf8"))
     .join("\n") + "\n({ports:AudioPorts,audio:AudioSetup})",
   { crypto: require("node:crypto").webcrypto },

@@ -115,7 +115,11 @@ const AudioPorts = (() => {
           right = ports.find((p) => p.audio_role === "right");
         if (!left || !right) continue;
         const used = (p) =>
-          board.edges.some((e) => e.to_node === node.id && e.to_port === p.id);
+          board.edges.some(
+            (e) =>
+              e.to_node === node.id &&
+              (e.to_port === p.id || e.to_right_port === p.id),
+          );
         if (used(left) && used(right))
           notes.push(
             `${node.label} · ${name} : gauche et droite raccordées (stéréo).`,

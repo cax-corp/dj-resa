@@ -279,3 +279,18 @@ Dans **Connectique audio**, choisir **Combo XLR / Jack 6,35** ou ajouter libreme
 Le modèle **Yamaha MG06X** ajoute volontairement 11 prises physiques (2 combos MIC/LINE, CH 3/4, CH 5/6, 4 sorties stéréo XLR/jack, casque stéréo). Il complète sans écraser les prises existantes et ignore les noms/sens déjà présents. Les réglages PAD, gain, alimentation fantôme et MONO/STEREO restent physiques et doivent être vérifiés sur la console. Le modèle est un point de départ entièrement modifiable.
 
 Appliquer `db/audio-socket-alternatives.sql` après `db/connector-catalog.sql`. La migration ajoute trois champs et valide les variantes côté serveur sans réécrire les anciens setups. `node tests/audio-sockets.cjs`, `node tests/audio-sockets-ui.cjs` et `tests/audio-sockets.sql` couvrent les prises combo, la fiche retenue, l’occupation physique unique, les groupes L/Mono–R, les brouillons, les anciens formats et la validation serveur.
+
+
+### Cordons stéréo et recherche de modèles
+
+**Setup et câbles → Cordon stéréo L/R** crée une seule liaison et un seul cordon entre deux ensembles stéréo. Chaque côté peut être une entrée/sortie groupée (2 RCA, mini-jack ou jack stéréo) ou deux prises mono L et R. Une paire peut être choisie depuis les groupes configurés ou manuellement sur le même appareil. Le mode classique propose automatiquement cette fenêtre lors d’une tentative de branchement entre stéréo et mono. Cela conserve les anciennes entrées RCA déjà saisies.
+
+Exemple : `DDJ-FLX6-GT Master (2 RCA)` → `MG06X CH 3 L/Mono + CH 4 R` produit un cordon **2 RCA mâles → 2 × jack 6,35 TS mâle**, avec le repère gauche/droite explicite. Les quatre prises d’un cordon L/R séparé sont occupées, le cordon se retire en une action et la liste d’emport compte une seule unité. Il ne s’agit pas d’un adaptateur de sommation mono. Les liaisons ordinaires et les anciens snapshots gardent leur format.
+
+Appliquer `db/stereo-cable-assemblies.sql` après `db/audio-socket-alternatives.sql`. La validation côté serveur contrôle toutes les branches et toutes leurs variantes, refuse la réutilisation d’une prise occupée, et limite ce mode aux signaux analogiques de niveau ligne. Les droits existants et les révisions sont conservés. Aucun setup existant n’est réécrit.
+
+**Mon matériel → Connectique audio → Rechercher un modèle** cherche dans quatre fiches avec source constructeur : Pioneer DDJ-FLX6 et DDJ-FLX6-GT, Yamaha MG06 et MG06X. Les noms sont normalisés (espaces, tirets et casse). La recherche propose également de copier une configuration de l’inventaire. Il s’agit d’un catalogue documenté et extensible, pas d’une recherche Internet automatique ou d’une API universelle. Un modèle absent est annoncé comme tel, avec un lien vers une recherche de notice. Aucun service externe ni clé API n’est requis. Les modèles peuvent être étendus dans `audio-models.js` après vérification des sources.
+
+L’import affiche les prises avant ajout. Les noms/sens déjà présents sont désactivés et, si du matériel est déjà configuré, aucune prise n’est cochée automatiquement. Les prises déjà enregistrées sous un autre nom ne sont pas devinées : l’utilisateur coche explicitement les ajouts. Les anciennes prises, réservations et copies de connectique restent inchangées.
+
+`node tests/stereo-cables.cjs` couvre les câbles groupés et séparés, leur nombre et l’occupation de chaque branche ; `node tests/stereo-cables-ui.cjs` reproduit DDJ → MG06X, la sélection manuelle, la recherche de modèles, les impressions, SVG, le mobile et la sauvegarde ; `tests/stereo-cables.sql` vérifie les sauvegardes et refus côté base dans une transaction annulée.

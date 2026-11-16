@@ -6,6 +6,8 @@ const audio = vm.runInNewContext(
     "\n" +
     fs.readFileSync(__dirname + "/../connector-picker.js", "utf8") +
     "\n" +
+    fs.readFileSync(__dirname + "/../audio-stereo.js", "utf8") +
+    "\n" +
     fs.readFileSync(__dirname + "/../audio-setup.js", "utf8") +
     "\nAudioSetup",
 );

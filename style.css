@@ -1411,3 +1411,12 @@ body.is-loading .route-progress { display: block; }
 .audio-alternative label { flex: 1; min-width: 130px; }
 .audio-alternative strong { min-width: 130px; }
 .audio-helpers { margin-top: 20px; }
+
+.audio-model-ports { display: grid; gap: 8px; margin: 16px 0; }
+.audio-model-port { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.audio-model-port input { width: auto; margin-top: 3px; flex-shrink: 0; }
+.audio-model-port > span { display: grid; gap: 4px; min-width: 0; }
+.audio-model-port > span > span { color: var(--text-light); font-size: 12px; }
+#stereo-cable-dialog [data-manual]:not([hidden]) { display: grid; gap: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 6px; }
+#audio-model-search [data-model-results] { display: grid; gap: 10px; margin-top: 16px; }
+.audio-model-launch { margin: 18px 0 24px; }

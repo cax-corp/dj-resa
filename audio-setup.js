@@ -21,26 +21,20 @@ const AudioSetup = (() => {
     };
   }
   function compatible(board, edge, ignoreId) {
-    const from = endpoint(
-        board,
-        edge.from_node,
-        edge.from_port,
-        edge.from_variant,
-      ),
-      to = endpoint(board, edge.to_node, edge.to_port, edge.to_variant);
-    if (!from.port || !to.port)
-      throw new Error("Sélectionnez une sortie et une entrée existantes.");
+    const from = AudioStereo.side(board, edge, "from"),
+      to = AudioStereo.side(board, edge, "to");
     if (from.node.id === to.node.id)
       throw new Error("Choisissez deux appareils différents.");
-    if (from.port.direction !== "out" || to.port.direction !== "in")
-      throw new Error("La liaison doit aller d’une sortie vers une entrée.");
-    if (from.port.signal !== to.port.signal)
+    if (
+      from.ports.some((p) => p.signal !== to.port.signal) ||
+      to.ports.some((p) => p.signal !== from.port.signal)
+    )
       throw new Error(
-        "Signaux incompatibles. Un câble seul ne convertit pas un niveau micro, ligne, amplifié ou numérique : prévoyez un appareil adapté.",
+        "Signaux incompatibles. Un câble seul ne convertit pas les niveaux audio.",
       );
-    if (Number(from.port.channels) !== Number(to.port.channels))
+    if (from.channels !== to.channels)
       throw new Error(
-        "Ces prises ne transportent pas le même format audio. Utilisez des ports L/R distincts ou un répartiteur adapté.",
+        "Pour relier une sortie stéréo à deux entrées mono, utilisez « Cordon stéréo L/R ».",
       );
     const family = from.port.signal,
       a = from.port.connector,
@@ -82,8 +76,14 @@ const AudioSetup = (() => {
     if (
       others.some(
         (e) =>
-          (e.from_node === edge.from_node && e.from_port === edge.from_port) ||
-          (e.to_node === edge.to_node && e.to_port === edge.to_port),
+          (e.from_node === edge.from_node &&
+            AudioStereo.used(e, "from").some((id) =>
+              AudioStereo.used(edge, "from").includes(id),
+            )) ||
+          (e.to_node === edge.to_node &&
+            AudioStereo.used(e, "to").some((id) =>
+              AudioStereo.used(edge, "to").includes(id),
+            )),
       )
     )
       throw new Error(
@@ -111,6 +111,24 @@ const AudioSetup = (() => {
           : port.gender === "female"
             ? " mâle"
             : "");
+  function stereoEnd(ports) {
+    if (ports.length === 1 && ports[0].connector === "rca_pair")
+      return (
+        "2 RCA " +
+        (ports[0].gender === "female"
+          ? "mâles"
+          : ports[0].gender === "male"
+            ? "femelles"
+            : "")
+      );
+    if (
+      ports.length === 2 &&
+      ports[0].connector === ports[1].connector &&
+      ports[0].gender === ports[1].gender
+    )
+      return "2 × " + cableEnd(ports[0]);
+    return ports.map(cableEnd).join(" + ");
+  }
   function cable(board, edge) {
     const { from, to } = compatible(board, edge, edge.id);
     const dx = ((from.node.x - to.node.x) / 100) * board.width,
@@ -135,10 +153,30 @@ const AudioSetup = (() => {
         usb: "USB · ",
       }[from.port.signal] || "";
     return {
-      label: prefix + cableEnd(from.port) + " → " + cableEnd(to.port),
+      label:
+        prefix +
+        (edge.stereo
+          ? stereoEnd(from.ports) + " → " + stereoEnd(to.ports)
+          : cableEnd(from.port) + " → " + cableEnd(to.port)),
       length,
-      from: from.node.label + " · " + from.port.name,
-      to: to.node.label + " · " + to.port.name,
+      from:
+        from.node.label +
+        " · " +
+        from.ports
+          .map(
+            (p, i) =>
+              (from.ports.length > 1 ? (i ? "R : " : "L : ") : "") + p.name,
+          )
+          .join(" / "),
+      to:
+        to.node.label +
+        " · " +
+        to.ports
+          .map(
+            (p, i) =>
+              (to.ports.length > 1 ? (i ? "R : " : "L : ") : "") + p.name,
+          )
+          .join(" / "),
       estimated: !Number(edge.length),
       signal: from.port.signal,
     };
@@ -183,7 +221,7 @@ const AudioSetup = (() => {
       const ports = await Production.list("equipment_audio_ports", {
         equipment_id: equipmentId,
       });
-      dialog.innerHTML = `<div class="tool-toolbar"><h2>Connectique · ${esc(gear.name)}</h2><button type="button" class="btn" id="close-audio-catalog">Fermer</button></div><p class="tool-note">Décrivez les prises physiques de votre appareil. Pour deux prises gauche / droite, créez deux ports distincts. Cliquez sur le dessin pour choisir la connectique. Les setups déjà enregistrés conservent leur copie de ces prises.</p><form id="audio-ports-${equipmentId}" class="stack"><input name="record_id" type="hidden"><div class="row-2"><label>Nom du port<input name="name" required maxlength="100" placeholder="Master gauche"></label><label>Sens<select name="direction">${Production.options({ in: "Entrée", out: "Sortie" })}</select></label><div class="connector-field"><span>Connectique</span><input name="connector" type="hidden" value="xlr3"><input name="channels" type="hidden" value="1"><button type="button" class="btn connector-choice" id="choose-audio-connector" aria-haspopup="dialog"></button></div><label>Prise de l’appareil<select name="gender">${Production.options({ female: "Femelle", male: "Mâle", none: "Non applicable" })}</select></label><label>Signal<select name="signal">${Production.options(signals, "line")}</select></label><label>Groupe / repère (facultatif)<input name="group_name" maxlength="100" placeholder="CH 3 / 4, AUX, Master…"></label><label>Repère audio<select name="audio_role">${Production.options(AudioPorts.roles, "independent")}</select></label></div><input name="alternatives" type="hidden" value="[]"><section class="audio-alternatives"><h3>Autres fiches acceptées sur cette même prise</h3><p class="tool-note">Pour une prise combo ou plusieurs niveaux acceptés : ajoutez les possibilités ici. Une seule fiche pourra y être branchée à la fois. Pour deux prises L/R distinctes, utilisez « Ajouter une paire L/Mono–R » ci-dessous.</p><div id="audio-alternatives-list"></div><button type="button" class="btn small" id="add-audio-alternative">Ajouter une possibilité sur cette prise</button></section><div class="actions"><button class="btn primary">Enregistrer le port</button><button type="button" class="btn" id="new-audio-port">Nouveau port</button></div></form><section class="card audio-helpers"><h3>Ajouter rapidement des prises</h3><div class="actions"><button type="button" class="btn" id="add-stereo-pair">Ajouter une paire L/Mono–R</button><button type="button" class="btn" id="add-mg06x">Ajouter le modèle Yamaha MG06X</button></div><p class="tool-note">Les ajouts complètent la liste sans remplacer vos prises. Modèle MG06X : 2 combos MIC/LINE, entrées 3/4 et 5/6, sorties stéréo XLR et jack, casque. Vérifiez les réglages MIC/LINE, PAD, MONO/STEREO et le manuel avant branchement.</p></section><div class="tool-list">${
+      dialog.innerHTML = `<div class="tool-toolbar"><h2>Connectique · ${esc(gear.name)}</h2><button type="button" class="btn" id="close-audio-catalog">Fermer</button></div><p class="tool-note">Décrivez les prises physiques de votre appareil. Pour deux prises gauche / droite, créez deux ports distincts. Cliquez sur le dessin pour choisir la connectique. Les setups déjà enregistrés conservent leur copie de ces prises.</p><div class="actions audio-model-launch"><button type="button" class="btn primary" id="search-audio-model">Rechercher un modèle</button><span class="muted">Préremplir depuis une fiche ou un autre appareil.</span></div><form id="audio-ports-${equipmentId}" class="stack"><input name="record_id" type="hidden"><div class="row-2"><label>Nom du port<input name="name" required maxlength="100" placeholder="Master gauche"></label><label>Sens<select name="direction">${Production.options({ in: "Entrée", out: "Sortie" })}</select></label><div class="connector-field"><span>Connectique</span><input name="connector" type="hidden" value="xlr3"><input name="channels" type="hidden" value="1"><button type="button" class="btn connector-choice" id="choose-audio-connector" aria-haspopup="dialog"></button></div><label>Prise de l’appareil<select name="gender">${Production.options({ female: "Femelle", male: "Mâle", none: "Non applicable" })}</select></label><label>Signal<select name="signal">${Production.options(signals, "line")}</select></label><label>Groupe / repère (facultatif)<input name="group_name" maxlength="100" placeholder="CH 3 / 4, AUX, Master…"></label><label>Repère audio<select name="audio_role">${Production.options(AudioPorts.roles, "independent")}</select></label></div><input name="alternatives" type="hidden" value="[]"><section class="audio-alternatives"><h3>Autres fiches acceptées sur cette même prise</h3><p class="tool-note">Pour une prise combo ou plusieurs niveaux acceptés : ajoutez les possibilités ici. Une seule fiche pourra y être branchée à la fois. Pour deux prises L/R distinctes, utilisez « Ajouter une paire L/Mono–R » ci-dessous.</p><div id="audio-alternatives-list"></div><button type="button" class="btn small" id="add-audio-alternative">Ajouter une possibilité sur cette prise</button></section><div class="actions"><button class="btn primary">Enregistrer le port</button><button type="button" class="btn" id="new-audio-port">Nouveau port</button></div></form><section class="card audio-helpers"><h3>Ajouter rapidement des prises</h3><div class="actions"><button type="button" class="btn" id="add-stereo-pair">Ajouter une paire L/Mono–R</button><button type="button" class="btn" id="add-mg06x">Ajouter le modèle Yamaha MG06X</button></div><p class="tool-note">Les ajouts complètent la liste sans remplacer vos prises. Modèle MG06X : 2 combos MIC/LINE, entrées 3/4 et 5/6, sorties stéréo XLR et jack, casque. Vérifiez les réglages MIC/LINE, PAD, MONO/STEREO et le manuel avant branchement.</p></section><div class="tool-list">${
         ports
           .map(
             (p) =>
@@ -395,6 +433,9 @@ const AudioSetup = (() => {
         toast(`${missing.length} prise(s) ajoutée(s)`);
         await render();
       }
+      Production.buttons("#search-audio-model", () =>
+        AudioModels.open(gear, ports, addMissing),
+      );
       Production.buttons("#add-mg06x", async () => {
         if (
           !confirm(
@@ -524,7 +565,7 @@ const AudioSetup = (() => {
       selected = state.nodes[0]?.id || null;
     const editable = p._canEdit;
     $("#tool-content").innerHTML =
-      `<div class="tool-toolbar"><h2>Setup et plan de câbles</h2><div class="actions">${editable ? '<button class="btn primary" id="save-setup">Enregistrer le setup</button><button class="btn" id="discard-setup">Reprendre le setup enregistré</button>' : ""}<button class="btn" id="setup-svg">Télécharger le plan SVG</button><button class="btn" id="print-cables">Imprimer la liste des câbles</button><button class="btn" id="print-wiring">Imprimer les liaisons</button>${me.role === "admin" ? `<a class="btn" href="#/outils/${p.id}?section=equipment">Choisir le matériel du projet</a>` : ""}</div></div><p class="tool-note">Placez vos appareils, puis reliez leurs sorties aux entrées. Les types de signaux doivent correspondre. Un changement de niveau, de protocole ou une répartition nécessite l’appareil adapté. Les longueurs automatiques sont estimées à vol d’oiseau avec 20 % de marge et 1 m supplémentaire : ajustez-les selon le cheminement réel. Sur mobile, faites défiler le plan horizontalement ou utilisez les coordonnées sous le plan.</p><p id="setup-status" role="status"></p><div class="production-stage"><svg id="setup-stage" viewBox="0 0 1000 600" role="group" aria-label="Organisation des appareils et liaisons audio" xmlns="http://www.w3.org/2000/svg"></svg></div>${editable ? `<div class="board-controls"><section class="card"><h3>Dimensions et appareils</h3><form id="setup-dimensions" class="production-inline"><label>Largeur (m)<input name="width" type="number" min="1" max="200" step="0.1" value="${state.width}" required></label><label>Profondeur (m)<input name="depth" type="number" min="1" max="200" step="0.1" value="${state.depth}" required></label><button class="btn">Appliquer au brouillon</button></form><form id="setup-add" class="production-inline"><label>Matériel sélectionné<select name="unit" required></select></label><button class="btn">Ajouter au setup</button></form><button type="button" class="btn small" id="setup-add-all">Ajouter les appareils avec connectique</button><form id="setup-node" class="stack"><label>Appareil<select name="node"></select></label><label>Nom dans ce setup<input name="label" maxlength="200"></label><div class="row-2"><label>X (%)<input name="x" type="number" min="5" max="95" step="0.1"></label><label>Y (%)<input name="y" type="number" min="7" max="93" step="0.1"></label></div><div class="actions"><button type="button" class="btn small" id="refresh-node-ports">Actualiser la connectique depuis le catalogue</button><button type="button" class="btn small danger" id="remove-setup-node">Retirer l’appareil du setup</button></div></form></section><section class="card"><h3>Relier deux appareils</h3><form id="setup-wire" class="stack"><label>Sortie<select name="from" required></select></label><label>Entrée<select name="to" required></select></label><label>Longueur choisie (m, 0 = estimation)<input name="cable_length" type="number" min="0" max="200" step="0.1" value="0" required></label><button class="btn primary">Ajouter la liaison</button></form><button type="button" class="btn small" id="suggest-wires">Relier les correspondances uniques</button><p class="tool-note">Les choix ambigus restent à définir manuellement. Pour une conversion optique/coaxiale ou de niveau audio, ajoutez un convertisseur avec sa propre connectique.</p><h3>Zones du setup</h3><form id="setup-zone" class="stack"><label>Nom de zone<input name="name" required maxlength="100" placeholder="Cabine DJ, scène, public…"></label><label>Taille de la zone<select name="size"><option value="small">Petite</option><option value="medium" selected>Moyenne</option><option value="large">Grande</option></select></label><p class="tool-note">Déplacez la zone directement dans le plan. Les blocs des appareils gardent une taille automatique.</p><button class="btn">Ajouter la zone</button></form><div id="setup-zone-list"></div></section></div>` : ""}<section class="card production-section"><h3>Câbles à prévoir</h3><div id="setup-cable-summary"></div></section><div id="setup-connections" class="tool-list"></div><div id="setup-alerts"></div>`;
+      `<div class="tool-toolbar"><h2>Setup et plan de câbles</h2><div class="actions">${editable ? '<button class="btn primary" id="save-setup">Enregistrer le setup</button><button class="btn" id="discard-setup">Reprendre le setup enregistré</button>' : ""}<button class="btn" id="setup-svg">Télécharger le plan SVG</button><button class="btn" id="print-cables">Imprimer la liste des câbles</button><button class="btn" id="print-wiring">Imprimer les liaisons</button>${me.role === "admin" ? `<a class="btn" href="#/outils/${p.id}?section=equipment">Choisir le matériel du projet</a>` : ""}</div></div><p class="tool-note">Placez vos appareils, puis reliez leurs sorties aux entrées. Les types de signaux doivent correspondre. Un changement de niveau, de protocole ou une répartition nécessite l’appareil adapté. Les longueurs automatiques sont estimées à vol d’oiseau avec 20 % de marge et 1 m supplémentaire : ajustez-les selon le cheminement réel. Sur mobile, faites défiler le plan horizontalement ou utilisez les coordonnées sous le plan.</p><p id="setup-status" role="status"></p><div class="production-stage"><svg id="setup-stage" viewBox="0 0 1000 600" role="group" aria-label="Organisation des appareils et liaisons audio" xmlns="http://www.w3.org/2000/svg"></svg></div>${editable ? `<div class="board-controls"><section class="card"><h3>Dimensions et appareils</h3><form id="setup-dimensions" class="production-inline"><label>Largeur (m)<input name="width" type="number" min="1" max="200" step="0.1" value="${state.width}" required></label><label>Profondeur (m)<input name="depth" type="number" min="1" max="200" step="0.1" value="${state.depth}" required></label><button class="btn">Appliquer au brouillon</button></form><form id="setup-add" class="production-inline"><label>Matériel sélectionné<select name="unit" required></select></label><button class="btn">Ajouter au setup</button></form><button type="button" class="btn small" id="setup-add-all">Ajouter les appareils avec connectique</button><form id="setup-node" class="stack"><label>Appareil<select name="node"></select></label><label>Nom dans ce setup<input name="label" maxlength="200"></label><div class="row-2"><label>X (%)<input name="x" type="number" min="5" max="95" step="0.1"></label><label>Y (%)<input name="y" type="number" min="7" max="93" step="0.1"></label></div><div class="actions"><button type="button" class="btn small" id="refresh-node-ports">Actualiser la connectique depuis le catalogue</button><button type="button" class="btn small danger" id="remove-setup-node">Retirer l’appareil du setup</button></div></form></section><section class="card"><h3>Relier deux appareils</h3><form id="setup-wire" class="stack"><label>Sortie<select name="from" required></select></label><label>Entrée<select name="to" required></select></label><label>Longueur choisie (m, 0 = estimation)<input name="cable_length" type="number" min="0" max="200" step="0.1" value="0" required></label><button class="btn primary">Ajouter la liaison</button></form><button type="button" class="btn" id="add-stereo-cable">Cordon stéréo L/R</button><p class="tool-note">Une sortie stéréo RCA ou mini-jack vers deux entrées séparées, ou deux sorties L/R vers une prise stéréo. Un seul cordon, deux voies distinctes.</p><button type="button" class="btn small" id="suggest-wires">Relier les correspondances uniques</button><p class="tool-note">Les choix ambigus restent à définir manuellement. Pour une conversion optique/coaxiale ou de niveau audio, ajoutez un convertisseur avec sa propre connectique.</p><h3>Zones du setup</h3><form id="setup-zone" class="stack"><label>Nom de zone<input name="name" required maxlength="100" placeholder="Cabine DJ, scène, public…"></label><label>Taille de la zone<select name="size"><option value="small">Petite</option><option value="medium" selected>Moyenne</option><option value="large">Grande</option></select></label><p class="tool-note">Déplacez la zone directement dans le plan. Les blocs des appareils gardent une taille automatique.</p><button class="btn">Ajouter la zone</button></form><div id="setup-zone-list"></div></section></div>` : ""}<section class="card production-section"><h3>Câbles à prévoir</h3><div id="setup-cable-summary"></div></section><div id="setup-connections" class="tool-list"></div><div id="setup-alerts"></div>`;
     const svg = $("#setup-stage"),
       nodeForm = $("#setup-node"),
       wireForm = $("#setup-wire");
@@ -602,8 +643,10 @@ const AudioSetup = (() => {
                     port.direction === direction &&
                     !state.edges.some((e) =>
                       direction === "out"
-                        ? e.from_node === n.id && e.from_port === port.id
-                        : e.to_node === n.id && e.to_port === port.id,
+                        ? e.from_node === n.id &&
+                          AudioStereo.used(e, "from").includes(port.id)
+                        : e.to_node === n.id &&
+                          AudioStereo.used(e, "to").includes(port.id),
                     ),
                 )
                 .flatMap((port) =>
@@ -906,19 +949,135 @@ const AudioSetup = (() => {
         to_variant: to_variant || "primary",
         length: Number(f.elements.cable_length.value),
       };
+      const sourcePort = endpoint(
+          state,
+          from_node,
+          from_port,
+          from_variant,
+        ).port,
+        targetPort = endpoint(state, to_node, to_port, to_variant).port;
+      if (
+        sourcePort?.signal === "line" &&
+        targetPort?.signal === "line" &&
+        Number(sourcePort.channels) !== Number(targetPort.channels) &&
+        [1, 2].includes(Number(sourcePort.channels)) &&
+        [1, 2].includes(Number(targetPort.channels))
+      ) {
+        $("#add-stereo-cable").click();
+        toast("Complétez les deux branches du cordon stéréo.");
+        return;
+      }
       compatible(state, edge);
       state.edges.push(edge);
       selectors();
       draw();
       remember();
     });
+    $("#add-stereo-cable").onclick = () => {
+      const popup = document.createElement("dialog");
+      popup.className = "audio-dialog";
+      popup.id = "stereo-cable-dialog";
+      popup.setAttribute("aria-label", "Ajouter un cordon stéréo L/R");
+      const sides = {
+        source: {
+          stereo: AudioStereo.choices(state, "out"),
+          mono: AudioStereo.monoChoices(state, "out"),
+        },
+        target: {
+          stereo: AudioStereo.choices(state, "in"),
+          mono: AudioStereo.monoChoices(state, "in"),
+        },
+      };
+      const sideForm = (key, label) =>
+        `<label>${label}<select name="${key}" required><option value="">Choisir</option>${sides[key].stereo.map((s, i) => `<option value="${i}">${esc(s.label)}</option>`).join("")}<option value="manual">Choisir deux prises L/R manuellement…</option></select></label><div data-manual="${key}" hidden><label>Prise gauche (L)<select name="${key}_left"><option value="">Choisir la prise gauche</option>${sides[key].mono.map((p, i) => `<option value="${i}">${esc(p.label)}</option>`).join("")}</select></label><label>Prise droite (R)<select name="${key}_right"><option value="">Choisir la prise droite</option></select></label></div>`;
+      popup.innerHTML = `<h2>Cordon stéréo L/R</h2><p>Le côté gauche reste sur L et le côté droit sur R. Cette liaison ne mélange pas deux signaux en mono.</p><form class="stack">${sideForm("source", "Sortie stéréo / paire L–R")}${sideForm("target", "Entrée stéréo / paire L–R")}<label>Longueur du cordon (m, 0 = estimation)<input name="cable_length" type="number" min="0" max="200" step="0.1" value="0" required></label><p class="tool-note">Les prises déjà configurées en « 2 RCA stéréo » fonctionnent directement. Vos deux jacks n’ont pas de groupe ? Sélectionnez-les manuellement, sans modifier le catalogue.</p><div class="actions"><button class="btn primary">Ajouter le cordon</button><button type="button" class="btn" data-close-stereo>Annuler</button></div></form>`;
+      app.append(popup);
+      popup.showModal();
+      popup.querySelector("[data-close-stereo]").onclick = () => popup.close();
+      popup.addEventListener("close", () => popup.remove(), { once: true });
+      const form = popup.querySelector("form");
+      for (const key of ["source", "target"]) {
+        const select = form.elements[key],
+          left = form.elements[key + "_left"],
+          right = form.elements[key + "_right"];
+        select.onchange = () => {
+          const manual = select.value === "manual";
+          popup.querySelector('[data-manual="' + key + '"]').hidden = !manual;
+          left.required = right.required = manual;
+        };
+        left.onchange = () => {
+          const chosen = sides[key].mono[Number(left.value)];
+          right.innerHTML =
+            '<option value="">Choisir la prise droite</option>' +
+            sides[key].mono
+              .map((p, i) =>
+                chosen && p.node === chosen.node && p.port !== chosen.port
+                  ? `<option value="${i}">${esc(p.label)}</option>`
+                  : "",
+              )
+              .join("");
+        };
+        const prior =
+          wireForm.elements[key === "source" ? "from" : "to"].value.split("|");
+        const matching = sides[key].stereo.findIndex(
+          (s) =>
+            s.node === prior[0] &&
+            (s.port === prior[1] || s.right_port === prior[1]),
+        );
+        if (matching >= 0) select.value = String(matching);
+      }
+      Production.submit(form, async (f) => {
+        function pick(key) {
+          if (f.elements[key].value !== "manual")
+            return sides[key].stereo[Number(f.elements[key].value)];
+          const l = sides[key].mono[Number(f.elements[key + "_left"].value)],
+            r = sides[key].mono[Number(f.elements[key + "_right"].value)];
+          if (!l || !r || l.node !== r.node || l.port === r.port)
+            throw new Error(
+              "Choisissez L et R sur deux prises distinctes du même appareil.",
+            );
+          return { ...l, right_port: r.port, right_variant: r.variant };
+        }
+        const src = pick("source"),
+          dst = pick("target");
+        if (!src || !dst)
+          throw new Error("Choisissez une sortie et une entrée stéréo.");
+        const edge = {
+          id: crypto.randomUUID(),
+          stereo: true,
+          from_node: src.node,
+          from_port: src.port,
+          from_variant: src.variant,
+          to_node: dst.node,
+          to_port: dst.port,
+          to_variant: dst.variant,
+          length: Number(f.elements.cable_length.value),
+        };
+        if (src.right_port) {
+          edge.from_right_port = src.right_port;
+          edge.from_right_variant = src.right_variant;
+        }
+        if (dst.right_port) {
+          edge.to_right_port = dst.right_port;
+          edge.to_right_variant = dst.right_variant;
+        }
+        compatible(state, edge);
+        state.edges.push(edge);
+        selectors();
+        draw();
+        remember();
+        popup.close();
+      });
+    };
     Production.buttons("#suggest-wires", () => {
       let added = 0;
       for (const node of state.nodes)
         for (const input of node.ports.filter((p) => p.direction === "in")) {
           if (
             state.edges.some(
-              (e) => e.to_node === node.id && e.to_port === input.id,
+              (e) =>
+                e.to_node === node.id &&
+                AudioStereo.used(e, "to").includes(input.id),
             )
           )
             continue;
