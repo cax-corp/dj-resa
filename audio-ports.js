@@ -1,5 +1,42 @@
 /* A socket is physical; its accepted plugs are alternatives, never extra sockets. */
 const AudioPorts = (() => {
+  const signalLabels = {
+    mic: "Micro",
+    line: "Ligne",
+    speaker: "Puissance HP",
+    aes3: "AES/EBU",
+    spdif: "S/PDIF",
+    adat: "ADAT",
+    dante: "Dante",
+    avb: "AVB",
+    usb: "USB audio",
+  };
+  function signature(ports) {
+    return JSON.stringify(
+      ports
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          direction: p.direction,
+          connector: p.connector,
+          gender: p.gender,
+          signal: p.signal,
+          channels: Number(p.channels),
+          group_name: p.group_name || "",
+          audio_role: p.audio_role || "independent",
+          alternatives: (p.alternatives || [])
+            .map((v) => ({
+              id: v.id,
+              connector: v.connector,
+              gender: v.gender,
+              signal: v.signal,
+              channels: Number(v.channels),
+            }))
+            .sort((a, b) => a.id.localeCompare(b.id)),
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    );
+  }
   const roles = {
     independent: "Indépendant / mono",
     left_mono: "L / Mono",
@@ -166,5 +203,15 @@ const AudioPorts = (() => {
     }
     return notes;
   }
-  return { roles, variants, resolve, combo, mg06x, groups, groupNotes };
+  return {
+    roles,
+    variants,
+    resolve,
+    combo,
+    mg06x,
+    groups,
+    groupNotes,
+    signalLabels,
+    signature,
+  };
 })();

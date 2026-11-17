@@ -21,9 +21,10 @@ const AudioStereo = (() => {
     if (ports.some((p) => p.direction !== (key === "from" ? "out" : "in")))
       throw new Error("La liaison doit aller des sorties vers les entrées.");
     if (edge.stereo) {
-      if (ports.some((p) => p.signal !== "line"))
+      const bad = ports.find((p) => p.signal !== "line");
+      if (bad)
         throw new Error(
-          "Un cordon stéréo L/R relie des prises analogiques de niveau ligne.",
+          `${node.label} · ${bad.name} : signal configuré « ${AudioPorts.signalLabels[bad.signal] || bad.signal} ». Un cordon stéréo L/R nécessite du niveau ligne. Vérifiez cette prise dans le catalogue ; une entrée d’amplificateur est de niveau ligne, ses sorties vers des enceintes passives sont de puissance HP.`,
         );
       if (ports.length === 2 && ports.some((p) => Number(p.channels) !== 1))
         throw new Error("Chaque branche L et R doit utiliser une prise mono.");
