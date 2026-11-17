@@ -1443,3 +1443,9 @@ body.is-loading .route-progress { display: block; }
 .wire-selection-details:empty { display: none; }
 .wire-selection-details p { display: grid; gap: 5px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
 .wire-selection-details span { color: var(--text-light); font-size: 13px; line-height: 1.5; }
+
+.wire-format { font-size: 13px; color: var(--text); }
+.wire-pairing-help:empty { display: none; }
+.wire-pairing-help { display: grid; gap: 10px; padding: 12px; border-left: 3px solid var(--accent); background: var(--bg-alt); border-radius: 4px; overflow-wrap: anywhere; }
+.wire-pairing-help p { margin: 0; }
+.wire-pairing-help button { white-space: normal; text-align: left; }

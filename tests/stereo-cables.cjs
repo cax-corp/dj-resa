@@ -105,3 +105,70 @@ assert.equal(stereo.choices(board, "out").length, 1);
 console.log(
   "PASS: existing stereo RCA → dual jacks, paired RCA → paired jacks, one cable assembly, both branches occupied and malformed/reused branches rejected",
 );
+
+assert.equal(
+  stereo.matchingPairs(board, "in", {
+    node: "yamaha",
+    port: "CH3",
+    variant: "primary",
+  }).length,
+  1,
+);
+assert.equal(
+  stereo.matchingPairs(board, "in", {
+    node: "yamaha",
+    port: "CH4",
+    variant: "primary",
+  })[0].port,
+  "CH3",
+  "Choosing R must still preserve L/R ordering",
+);
+board.edges = [paired];
+assert.equal(
+  stereo.matchingPairs(board, "in", {
+    node: "yamaha",
+    port: "CH3",
+    variant: "primary",
+  }).length,
+  0,
+  "Occupied pair is not available",
+);
+board.edges = [];
+board.nodes[1].ports[1].alternatives = [
+  {
+    id: "trs-option",
+    connector: "jack_trs",
+    gender: "female",
+    signal: "line",
+    channels: 1,
+  },
+];
+assert.equal(
+  stereo.matchingPairs(board, "in", {
+    node: "yamaha",
+    port: "CH3",
+    variant: "primary",
+  }).length,
+  2,
+  "Different valid right plug choices remain ambiguous",
+);
+
+board.edges = [
+  {
+    id: "right-only",
+    from_node: "ddj",
+    from_port: "Master R",
+    to_node: "yamaha",
+    to_port: "CH4",
+    length: 1,
+  },
+];
+assert.equal(
+  stereo.matchingPairs(board, "in", {
+    node: "yamaha",
+    port: "CH3",
+    variant: "primary",
+  }).length,
+  0,
+  "A free left socket cannot take over an occupied right socket",
+);

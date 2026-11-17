@@ -177,5 +177,16 @@ const AudioStereo = (() => {
         }
     return result;
   }
-  return { used, side, choices, monoChoices };
+  function matchingPairs(board, direction, selected) {
+    if (!selected || selected.right_port) return [];
+    const variant = selected.variant || "primary";
+    return choices(board, direction).filter(
+      (c) =>
+        c.right_port &&
+        c.node === selected.node &&
+        ((c.port === selected.port && c.variant === variant) ||
+          (c.right_port === selected.port && c.right_variant === variant)),
+    );
+  }
+  return { used, side, choices, monoChoices, matchingPairs };
 })();

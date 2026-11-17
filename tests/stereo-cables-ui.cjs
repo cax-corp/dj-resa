@@ -163,9 +163,11 @@ const { mock, pid, sourceId, speakerId } = require("./production-mock.cjs");
       .getAttribute("value");
     await wire.locator("[name=from]").selectOption(src);
     await wire.locator("[name=to]").selectOption(dst);
-    await wire
-      .getByRole("button", { name: "Ajouter la liaison", exact: true })
-      .click();
+    assert.ok(
+      (await wire.locator("[name=to]").inputValue()).startsWith("group:"),
+      "Selecting a mono member for stereo must select its pair",
+    );
+    await page.locator("#add-stereo-cable").click();
     popup = page.locator("#stereo-cable-dialog");
     await popup.waitFor();
     assert.notEqual(await popup.locator("[name=source]").inputValue(), "");
