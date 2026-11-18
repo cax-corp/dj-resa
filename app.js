@@ -368,7 +368,7 @@ function projectRow(p, isAdmin, unpaid = 0) {
   const date = p.event_date ? new Date(p.event_date + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : 'À définir';
   return `
   <a class="row-card project-row" href="#/${isAdmin ? 'admin/projets' : 'projets'}/${p.id}">
-    <div class="project-name-cell"><span class="project-file-icon" aria-hidden="true">${navIcon('projects')}</span><div>
+    <div class="project-name-cell"><span class="project-file-icon" aria-hidden="true">${ProjectIcons.svg(p.icon)}</span><div>
       <strong>${esc(p.title)}</strong>${p.event_type ? `<span class="project-type-label">${esc(EventTypes.label(p.event_type))}</span>` : ''}
       <div class="muted">${isAdmin && p.client ? esc(p.client.full_name || p.client.email || 'Sans nom') : 'Événement'}</div>
       ${isAdmin && unpaid > 0 ? `<div class="warn-text">${fmtEur(unpaid)} à encaisser</div>` : ''}
@@ -492,6 +492,7 @@ async function renderNewProject(preClient = '') {
         <label>Type de prestation<select name="event_type" required>${EventTypes.options('', 'Choisir un type de prestation')}</select></label>
         <p class="muted event-type-guidance" id="new-type-guidance">Choisissez le type d’événement. La date peut rester à définir.</p>
         <label>Nom du projet / événement<input name="title" required></label>
+        ${ProjectIcons.field('grid')}
         <div class="row-2">
           <label>Date<input type="date" name="event_date"></label>
           <label>Lieu du répertoire<select name="venue_id"><option value="">À définir</option>${venues.map(v=>`<option value="${v.id}">${esc(v.name)}${v.address?' · '+esc(v.address):''}</option>`).join('')}</select><a href="#/lieux">Créer un lieu dans le répertoire →</a></label>
@@ -501,6 +502,7 @@ async function renderNewProject(preClient = '') {
       </form>
     </section>`;
 
+  ProjectIcons.bind($('#new-project'));
   const typeSelect = $('#new-project [name=event_type]');
   typeSelect.onchange = () => {
     const type = typeSelect.value;
@@ -541,6 +543,7 @@ function infoBlock(p, client, isAdmin, venues = [], venueId = '') {
       <h2>Modifier le projet</h2>
       <form id="edit-form" class="stack">
         <label>Nom<input name="title" value="${esc(p.title)}" required></label>
+        ${ProjectIcons.field(p.icon)}
         <label>Type de prestation<select name="event_type">${EventTypes.options(p.event_type)}</select></label>
         <div class="row-2">
           <label>Date<input type="date" name="event_date" value="${p.event_date || ''}"></label>
@@ -1019,10 +1022,11 @@ async function renderProject(id, isAdmin) {
   // Modification du projet (admin)
   const editForm = $('#edit-form');
   if (editForm) {
+    ProjectIcons.bind(editForm);
     editForm.onsubmit = async (e) => {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
-      if (await run(sb.rpc('save_catalog_project', {target_project:id,details:{title:f.title.trim(),event_type:f.event_type||null,event_date:f.event_date||null,status:f.status,description:f.description.trim()||null},venue_choice:f.venue_id}), 'Projet enregistré')) { Drafts.clear(e.target); reload(); }
+      if (await run(sb.rpc('save_catalog_project', {target_project:id,details:{title:f.title.trim(),icon:ProjectIcons.known(f.icon),event_type:f.event_type||null,event_date:f.event_date||null,status:f.status,description:f.description.trim()||null},venue_choice:f.venue_id}), 'Projet enregistré')) { Drafts.clear(e.target); reload(); }
     };
     $('#delete-project').onclick = async () => {
       if (!confirm('Supprimer ce projet et tout son contenu ? Cette action est définitive.')) return;

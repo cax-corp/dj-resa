@@ -1,0 +1,40 @@
+const {chromium}=require('playwright'),assert=require('node:assert/strict');
+const {mock,pid}=require('./production-mock.cjs');
+(async()=>{
+ const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:'application/javascript',body:mock}));
+  const project=async()=>{await page.goto('http://127.0.0.1:8000/#/admin/projets/'+pid);await page.locator('#edit-form').waitFor();};
+  await page.goto('http://127.0.0.1:8000/#/admin');await page.locator('.project-row').first().waitFor();
+  assert.equal(await page.locator('.project-row').first().locator('[data-project-icon-key]').getAttribute('data-project-icon-key'),'grid');
+  await project();let form=page.locator('#edit-form');await form.locator('[data-choose-project-icon]').click();
+  let popup=page.locator('#project-icon-dialog');assert.equal(await popup.locator('[data-icon-option]').count(),32);
+  await page.screenshot({path:'/workspace/work/project-icons-desktop.png',animations:'disabled'});
+  await popup.locator('input[type=search]').fill('mariage');assert.equal(await popup.locator('[data-icon-option]').count(),2);
+  await popup.locator('[data-icon-option=rings]').click();await popup.waitFor({state:'detached'});
+  assert.equal(await form.locator('[name=icon]').inputValue(),'rings');assert.equal(await page.evaluate(()=>window.testState.db.projects[0].icon),undefined,'Selection must wait for save');
+  await page.goto('http://127.0.0.1:8000/#/admin');await project();form=page.locator('#edit-form');
+  assert.equal(await form.locator('[name=icon]').inputValue(),'rings');assert.equal(await form.locator('[data-choose-project-icon] svg').getAttribute('data-project-icon-key'),'rings');
+  await form.getByRole('button',{name:'Enregistrer',exact:true}).click();await page.waitForFunction(()=>window.testState.db.projects[0].icon==='rings');
+  await page.goto('http://127.0.0.1:8000/#/admin');await page.locator('.project-row').first().waitFor();assert.equal(await page.locator('.project-row').first().locator('[data-project-icon-key]').getAttribute('data-project-icon-key'),'rings');
+  await project();await page.locator('#edit-form [data-choose-project-icon]').click();popup=page.locator('#project-icon-dialog');await popup.getByRole('button',{name:'Fermer',exact:true}).click();await popup.waitFor({state:'detached'});
+  assert.equal(await page.locator('#edit-form [name=icon]').inputValue(),'rings');
+  await page.locator('#edit-form [data-choose-project-icon]').click();await page.keyboard.press('Escape');await popup.waitFor({state:'detached'});
+  await page.goto('http://127.0.0.1:8000/#/admin/nouveau');await page.locator('#new-project').waitFor();form=page.locator('#new-project');
+  await form.locator('[name=title]').fill('Réception avec traiteur');await form.locator('[name=event_type]').selectOption('autre');await form.locator('[data-choose-project-icon]').click();
+  popup=page.locator('#project-icon-dialog');await popup.locator('[data-icon-option=chef]').click();await form.getByRole('button',{name:'Créer le projet',exact:true}).click();
+  await page.waitForFunction(()=>window.testState.db.projects.some(p=>p.title==='Réception avec traiteur'&&p.icon==='chef'));
+  await page.goto('http://127.0.0.1:8000/#/admin');await page.locator('.project-row').filter({hasText:'Réception avec traiteur'}).waitFor();
+  assert.equal(await page.locator('.project-row').filter({hasText:'Réception avec traiteur'}).locator('[data-project-icon-key]').getAttribute('data-project-icon-key'),'chef');
+  await page.locator('#theme-toggle').click();await page.setViewportSize({width:390,height:844});await page.locator('.project-row').first().locator('.project-file-icon').waitFor({state:'visible'});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+  await project();await page.locator('#edit-form [data-choose-project-icon]').click();popup=page.locator('#project-icon-dialog');await popup.locator('input').fill('repas');
+  await page.screenshot({path:'/workspace/work/project-icons-mobile-dark.png',animations:'disabled'});assert.equal(await popup.evaluate(d=>d.scrollWidth<=d.clientWidth+1),true);
+  await popup.locator('[data-icon-option=utensils]').click();await page.locator('#edit-form').getByRole('button',{name:'Enregistrer',exact:true}).click();await page.waitForFunction(()=>window.testState.db.projects[0].icon==='utensils');
+  await page.evaluate(()=>{window.testState.role='client';window.testState.signedIn=true;});await page.goto('http://127.0.0.1:8000/#/connexion');await page.goto('http://127.0.0.1:8000/#/projets');
+  await page.locator('.project-row').first().waitFor();assert.equal(await page.locator('.project-row').first().locator('[data-project-icon-key]').getAttribute('data-project-icon-key'),'utensils');
+  assert.equal(await page.locator('[data-choose-project-icon]').count(),0);
+  assert.deepEqual(errors,[]);console.log('PASS: 32 monochrome icons, searchable picker, draft/preview/cancel/Escape, edit and creation persistence, project list markers, client visibility, admin-only controls and mobile/dark display');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});

@@ -1,0 +1,33 @@
+begin;
+select set_config('test.icons_admin',(select id::text from public.profiles where role='admin' limit 1),true);
+select set_config('test.icons_client',(select id::text from public.profiles where role='client' limit 1),true);
+set local role authenticated;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.icons_admin'),'role','authenticated')::text,true);
+do $$declare p uuid;legacy uuid;share_token uuid;details jsonb;rejected boolean;begin
+ p:=public.create_catalog_project(jsonb_build_object('client_id',current_setting('test.icons_client'),'title','Icon fixture','event_type','mariage','icon','rings'));
+ if (select icon from public.projects where id=p)<>'rings' then raise exception 'Creation icon lost';end if;
+ legacy:=public.create_catalog_project(jsonb_build_object('client_id',current_setting('test.icons_client'),'title','Legacy icon fixture'));
+ if (select icon from public.projects where id=legacy)<>'grid' then raise exception 'Legacy default changed';end if;
+ insert into public.project_shares(project_id,sections) values(p,array['event_date','status']) returning project_shares.token into share_token;
+ insert into public.project_guests(project_id,full_name,dietary) values(p,'Guest fixture','Preserved dietary needs');
+ insert into public.project_payments(project_id,label,amount) values(p,'Preserved amount',123);
+ details:=jsonb_build_object('title','Icon fixture','event_type','mariage','event_date',null,'status','preparation','description','Preserved notes','icon','chef');
+ perform public.save_catalog_project(p,details,'keep');
+ if (select icon from public.projects where id=p)<>'chef' then raise exception 'Saved icon lost';end if;
+ if not exists(select 1 from public.project_shares s where s.token=share_token and project_id=p) or not exists(select 1 from public.project_guests where project_id=p and dietary='Preserved dietary needs') or not exists(select 1 from public.project_payments where project_id=p and amount=123) then raise exception 'Project content changed';end if;
+ perform public.save_catalog_project(p,details-'icon','keep');
+ if (select icon from public.projects where id=p)<>'chef' then raise exception 'Older client reset icon';end if;
+ rejected:=false;begin perform public.save_catalog_project(p,details||'{"icon":"<svg onload=alert(1)>","title":"Should roll back"}','keep');exception when check_violation then rejected:=true;end;
+ if not rejected then raise exception 'Unknown icon accepted';end if;
+ if (select title from public.projects where id=p)<>'Icon fixture' or (select icon from public.projects where id=p)<>'chef' then raise exception 'Invalid icon caused partial save';end if;
+ perform set_config('test.icons_project',p::text,true);
+end $$;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.icons_client'),'role','authenticated')::text,true);
+do $$declare p uuid:=current_setting('test.icons_project')::uuid;rejected boolean:=false;begin
+ if (select icon from public.projects where id=p)<>'chef' then raise exception 'Client cannot see marker';end if;
+ update public.projects set icon='film' where id=p;
+ if (select icon from public.projects where id=p)<>'chef' then raise exception 'Client changed icon directly';end if;
+ begin perform public.save_catalog_project(p,'{"title":"Forbidden","status":"preparation","icon":"film"}','keep');exception when insufficient_privilege then rejected:=true;end;
+ if not rejected then raise exception 'Client changed project via RPC';end if;
+end $$;
+rollback;

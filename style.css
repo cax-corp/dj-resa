@@ -1460,3 +1460,19 @@ body.is-loading .route-progress { display: block; }
   .topbar > .syntra-brand .brand-logo { width: 88px; }
 }
 @media print { .brand-logo { filter: none !important; } }
+
+/* Project markers share the existing thin monochrome icon style. */
+.project-name-cell .project-file-icon { display: grid; }
+.project-icon-field { display: grid; gap: 8px; }
+.project-icon-choice { display: flex; align-items: center; gap: 12px; width: fit-content; max-width: 100%; text-align: left; white-space: normal; }
+.project-icon-choice .muted { font-size: 12px; }
+.project-icon-choice svg { flex-shrink: 0; }
+.project-icon-dialog { margin: auto; width: min(760px,calc(100vw - 24px)); max-height: 88dvh; overflow: auto; padding: 24px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }
+.project-icon-dialog::backdrop { background: #0009; }
+.project-icon-dialog > label { display: grid; gap: 8px; margin: 16px 0; }
+.project-icon-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(110px,1fr)); gap: 10px; }
+.project-icon-option { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px 10px; min-height: 96px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-alt); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.project-icon-option:hover, .project-icon-option[aria-pressed=true] { border-color: var(--accent); background: var(--bg-hover); }
+.project-icon-option[aria-pressed=true] { box-shadow: inset 0 0 0 1px var(--accent); }
+@media(max-width:600px) { .project-icon-dialog { padding: 16px; } .project-icon-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .project-name-cell .project-file-icon { width: 30px; height: 34px; } }
+@media print { .project-icon-dialog { display: none !important; } }
