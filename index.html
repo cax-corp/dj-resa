@@ -3,26 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DJ Booking</title>
+  <title>CAX Syntra</title>
   <!-- Évite le flash au chargement : applique le thème avant le rendu -->
   <script>
     document.documentElement.dataset.theme =
       localStorage.getItem('theme') ||
       (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   </script>
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=25">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <a class="skip-link" href="#app">Aller au contenu</a>
   <aside class="sidebar" aria-label="Espace de travail">
-    <a class="brand sidebar-brand" href="#/">DJ<span>Booking</span><small>Espace de travail</small></a>
+    <a class="brand sidebar-brand syntra-brand" href="#/" aria-label="Syntra — accueil"><img class="brand-logo" src="assets/syntra.svg?v=1" width="185" height="65" alt="Syntra" decoding="async"></a>
     <div class="sidebar-label">Organisation</div>
     <nav id="nav" aria-label="Navigation principale"></nav>
     <div class="sidebar-footer"><div class="profile-avatar" id="profile-avatar" aria-hidden="true">DJ</div><div><strong id="profile-name"></strong><span id="profile-role"></span></div></div>
   </aside>
  <header class="topbar">
-  <a class="brand" href="#/">DJ<span>Booking</span></a>
+  <a class="brand syntra-brand" href="#/" aria-label="Syntra — accueil"><img class="brand-logo" src="assets/syntra.svg?v=1" width="185" height="65" alt="Syntra" decoding="async"></a>
   <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav">☰</button>
   <div class="workspace-breadcrumb"><span>Espace de travail</span><span aria-hidden="true">/</span><strong id="workspace-section">Projets</strong></div>
   <div class="top-actions">
