@@ -298,7 +298,7 @@ async function renderAccount() {
         </form>
       </section>
     </div>
-    ${isAdmin ? settingsBlock(settings) + ratesBlock(plans, parseHash().params.get('type') || '') : ''}`;
+    ${isAdmin ? settingsBlock(settings) + ratesBlock(plans, parseHash().params.get('type') || '') + '<section class="card addon-catalog-panel" id="tariff-addons-catalog"></section>' : ''}`;
 
   $('#acc-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -331,6 +331,8 @@ async function renderAccount() {
     const data = Object.fromEntries(SETTINGS_FIELDS.map(([k]) => [k, String(f.get(k) || '').trim()]));
     await run(sb.from('settings').update({ data }).eq('id', 1), 'Émetteur enregistré');
   };
+
+  TariffAddons.catalog().then(() => { if (parseHash().params.get('options')) $('#tariff-addons-catalog')?.scrollIntoView({block:'start'}); }).catch(ERR);
 
   const rateData = (f) => ({
     name: String(f.get('name')).trim(),
@@ -851,8 +853,9 @@ function paymentsBlock(pays, isAdmin) {
       ${pays.map(p => `
         <li>
           <div>
-            <strong>${esc(p.label)}</strong>${p.is_base ? '<span class="tag-base">Tarif</span>' : ''}
-            ${p.is_base && p.quantity ? `<div class="muted small-text">${Number(p.quantity)} × ${fmtEur(p.unit_price ?? 0)}</div>` : ''}
+            <strong>${esc(p.label)}</strong>${p.is_base ? '<span class="tag-base">Tarif</span>' : p.is_addon ? '<span class="tag-base">Option</span>' : ''}
+            ${(p.is_base || p.is_addon) && p.quantity ? `<div class="muted small-text">${Number(p.quantity)} × ${fmtEur(p.unit_price ?? 0)}${p.is_addon ? ' / ' + ({forfait:'forfait',heure:'heure',unite:'unité'}[p.addon_unit]||'forfait') : ''}</div>` : ''}
+${p.is_addon && p.addon_description ? `<div class="muted small-text">${esc(p.addon_description)}</div>` : ''}
           </div>
           <div class="pay-right">
             <span class="status ${p.paid ? 'accepted' : 'pending'}">${p.paid ? 'Payé' : 'À régler'}</span>
@@ -992,7 +995,7 @@ async function renderProject(id, isAdmin) {
     ${!p._team ? `<div id="project-finance" class="project-section">
       <div class="section-heading"><p class="eyebrow">Gestion</p><h2>Tarification et facturation</h2></div>
       <section class="card finance-work-hours"><h3>Total des heures du planning</h3>${WorkHours.render(sc.data)}<a class="btn small no-print" href="#/outils/${id}?section=conductor">Ouvrir le planning</a></section>
-      <div class="extras">${isAdmin ? tariffBlock(base, rp.data, p.event_type) : ''}${paymentsBlock(pa.data, isAdmin)}${invoicesBlock(iv.data, isAdmin)}</div>
+      <div class="extras">${isAdmin ? tariffBlock(base, rp.data, p.event_type) : ''}${paymentsBlock(pa.data, isAdmin)}${invoicesBlock(iv.data, isAdmin)}</div>${isAdmin ? '<section class="card addon-project-panel no-print" id="project-addons"></section>' : ''}
     </div>` : ''}
     ${isAdmin ? sharingBlock() : ''}`;
 
@@ -1001,6 +1004,7 @@ async function renderProject(id, isAdmin) {
     document.getElementById(button.dataset.projectSection).scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
   });
 
+  if (isAdmin) TariffAddons.project(p,pa.data,reload).catch(ERR);
   $('#ics').onclick = () => downloadIcs(p);
   $('#print').onclick = () => window.print();
   $('#print-must-play').onclick = () => Enhancements.printMusic(p,must);
@@ -1162,7 +1166,7 @@ async function renderProject(id, isAdmin) {
     if (!pa.data.length) return ERR(new Error('Ajoutez au moins une ligne de devis avant de générer la facture'));
     if (!confirm('Générer la facture ? Elle sera figée avec les montants actuels.')) return;
 
-    const lines = pa.data.map(x => ({ label: x.label, amount: Number(x.amount), paid: x.paid }));
+    const lines = pa.data.map(x => ({ label: x.label, amount: Number(x.amount), paid: x.paid, ...(x.is_addon ? {is_addon:true,unit:x.addon_unit||'forfait',quantity:Number(x.quantity),unit_price:Number(x.unit_price),description:x.addon_description||''} : {}) }));
     const total = lines.reduce((s, l) => s + l.amount, 0);
     const paidSum = lines.filter(l => l.paid).reduce((s, l) => s + l.amount, 0);
     const { data, error } = await sb.from('invoices').insert({
@@ -1240,7 +1244,7 @@ async function renderInvoice(id) {
       <table class="inv-table">
         <thead><tr><th>Désignation</th><th class="r">Montant</th></tr></thead>
         <tbody>
-          ${lines.map(l => `<tr><td>${esc(l.label)}</td><td class="r">${fmtEur(l.amount)}</td></tr>`).join('')}
+          ${lines.map(l => `<tr><td>${esc(l.label)}${l.is_addon ? `<div class="muted small-text">Option · ${Number(l.quantity)} × ${fmtEur(l.unit_price)} / ${{forfait:'forfait',heure:'heure',unite:'unité'}[l.unit]||'forfait'}</div>${l.description ? `<div class="muted small-text">${esc(l.description)}</div>` : ''}` : ''}</td><td class="r">${fmtEur(l.amount)}</td></tr>`).join('')}
         </tbody>
       </table>
 

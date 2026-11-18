@@ -1556,3 +1556,21 @@ body.is-loading .route-progress { display: block; }
 .tool-quick-links,.tool-category-filter { position:static; flex:none; flex-direction:row; align-items:center; padding:0; border:0; background:transparent; box-shadow:none; }
 .tool-quick-links a { border:0; text-transform:none; letter-spacing:0; }
 @media(max-width:760px) { .tool-quick-links { flex-basis:100%; padding-top:5px; border-top:1px solid var(--border); } }
+
+/* Additional commercial options, distinct from the base tariff. */
+.addon-catalog-panel,.addon-project-panel { margin-top:24px; scroll-margin-top:90px; }
+.addon-new { margin:18px 0; }
+.addon-new > summary,.addon-editor > summary { cursor:pointer; font-weight:600; }
+.addon-new form,.addon-catalog-item form,.addon-editor form { margin-top:18px; }
+.addon-catalog-list { display:grid; gap:8px; margin-top:18px; }
+.addon-catalog-item { border:1px solid var(--border); border-radius:6px; padding:14px; }
+.addon-catalog-item > summary { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; cursor:pointer; font-size:14px; }
+.addon-catalog-item > summary::before { content:'＋'; color:var(--text-light); }
+.addon-catalog-item[open] > summary::before { content:'−'; }
+.addon-catalog-item > summary > span:first-child { flex:1; }
+.addon-applied { display:flex; align-items:start; justify-content:space-between; gap:16px; padding:14px 0; border-top:1px solid var(--border); }
+.addon-applied p { font-size:13px; margin:4px 0 0; white-space:pre-wrap; }
+.addon-subtotal { margin:16px 0; }
+.addon-editor { margin-top:18px; border-top:1px solid var(--border); padding-top:16px; }
+.addon-access-note { margin-top:18px; }
+@media(max-width:600px) { .addon-catalog-item { padding:12px; } .addon-applied { flex-wrap:wrap; } }

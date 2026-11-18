@@ -1,0 +1,40 @@
+begin;
+select set_config('test.addon_admin',(select id::text from public.profiles where role='admin' limit 1),true);
+select set_config('test.addon_client',(select id::text from public.profiles where role='client' limit 1),true);
+set local role authenticated;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.addon_admin'),'role','authenticated')::text,true);
+do $$declare p uuid;a uuid;line uuid;bill uuid;rejected boolean;begin
+ insert into public.projects(client_id,title,event_type) values(current_setting('test.addon_client')::uuid,'Addon fixture','mariage') returning id into p;
+ insert into public.rate_addons(name,amount,unit,description) values('Addon fixture',25,'forfait','Snapshot description') returning id into a;
+ insert into public.project_payments(project_id,label,amount,is_base) values(p,'Preserved base',500,true);
+ insert into public.project_payments(project_id,label,amount,quantity,unit_price,is_addon,addon_id,addon_description) values(p,'Syntra fixture',50,2,25,true,a,'Snapshot description') returning id into line;
+ insert into public.invoices(project_id,lines,total) values(p,jsonb_build_array(jsonb_build_object('label','Syntra fixture','amount',50,'quantity',2,'unit_price',25,'is_addon',true,'description','Snapshot description')),550) returning id into bill;
+ update public.rate_addons set amount=99,name='Changed catalog',description='Changed description' where id=a;
+ if not exists(select 1 from public.project_payments where id=line and amount=50 and unit_price=25 and addon_description='Snapshot description') then raise exception 'Catalog changed project snapshot';end if;
+ rejected:=false;begin update public.project_payments set amount=1 where id=line;exception when check_violation then rejected:=true;end;if not rejected then raise exception 'Inconsistent option total allowed';end if;
+ rejected:=false;begin update public.project_payments set is_base=true where id=line;exception when check_violation then rejected:=true;end;if not rejected then raise exception 'Option became base price';end if;
+ update public.project_payments set paid=true where id=line;
+ delete from public.rate_addons where id=a;
+ if not exists(select 1 from public.project_payments where id=line and addon_id is null and is_addon and paid and amount=50) then raise exception 'Catalog delete damaged quote';end if;
+ delete from public.project_payments where id=line;
+ if not exists(select 1 from public.invoices where id=bill and total=550 and lines->0->>'amount'='50') then raise exception 'Invoice changed after option removal';end if;
+ insert into public.project_payments(project_id,label,amount,quantity,unit_price,is_addon) values(p,'Offered option',0,1,0,true);
+ insert into public.project_payments(project_id,label,amount,quantity,unit_price,is_addon,addon_unit) values(p,'Fractional hours',1.01,1.5,0.67,true,'heure');
+ rejected:=false;begin update public.project_payments set addon_unit='invalid' where project_id=p and is_addon;exception when check_violation then rejected:=true;end;if not rejected then raise exception 'Invalid commercial unit accepted';end if;
+ if (select sum(amount) from public.project_payments where project_id=p)<>501.01 then raise exception 'Option totals invalid';end if;
+ perform set_config('test.addon_project',p::text,true);
+end $$;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.addon_client'),'role','authenticated')::text,true);
+do $$declare rejected boolean;n integer;begin
+ if not exists(select 1 from public.project_payments where project_id=current_setting('test.addon_project')::uuid and is_addon) then raise exception 'Client cannot see applied options';end if;
+ if exists(select 1 from public.rate_addons) then raise exception 'Client can read private catalog';end if;
+ update public.project_payments set amount=999 where project_id=current_setting('test.addon_project')::uuid;get diagnostics n=row_count;if n<>0 then raise exception 'Client changed prices';end if;
+ rejected:=false;begin insert into public.rate_addons(name,amount) values('Unauthorized',1);exception when insufficient_privilege then rejected:=true;end;if not rejected then raise exception 'Client can add tariff option';end if;
+end $$;
+reset role;
+set local role anon;
+select set_config('request.jwt.claims','{"role":"anon"}',true);
+do $$declare rejected boolean:=false;begin
+ begin perform 1 from public.rate_addons;exception when insufficient_privilege then rejected:=true;end;if not rejected then raise exception 'Anonymous catalog access allowed';end if;
+end $$;
+rollback;

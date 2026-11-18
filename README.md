@@ -335,3 +335,11 @@ Les 14 nouveaux espaces sont : repas et menus, hébergement, transports et navet
 Déployer `db/project-operations.sql` avant les nouveaux scripts. Cette migration ajoute une table isolée avec RLS et vérifie par empreinte que toutes les tables existantes sont inchangées. Les règles d’accès des opérations existantes s’appliquent : administrateur, client propriétaire et équipe affectée selon ses droits ; aucune exposition anonyme ni ajout automatique aux liens publics. Les modifications concurrentes sont détectées par révision.
 
 Validation : `node tests/project-operations-ui.cjs` ; exécuter `tests/project-operations.sql` dans une transaction (les fixtures sont annulées en fin de script).
+
+### Options tarifaires
+
+Dans **Mon compte → Options et prestations additionnelles**, configurez un catalogue de suppléments (forfait, heure ou unité), éventuellement limité à un type de prestation. Les sept exemples proposés, dont **Accès au logiciel Syntra**, ont un prix à définir : aucune somme n’est inventée et aucune option n’est appliquée automatiquement. Un prix explicitement fixé à 0 € représente une option offerte. Les options peuvent être désactivées dans le catalogue.
+
+Dans **Projet → Finances → Options du projet**, ajoutez une option du catalogue ou une ligne personnalisée. Le libellé, la description, l’unité, la quantité et le prix sont copiés dans le projet et restent ajustables. Les options sont incluses dans les totaux, le reste à régler, la rentabilité et les nouvelles factures ; modifier le catalogue ne retarife pas les projets. Les factures déjà générées restent figées. Les droits d’accès à Syntra sont gérés indépendamment des lignes commerciales.
+
+Déployer `db/tariff-addons.sql`, puis `db/tariff-addon-units.sql` avant le frontend. Le catalogue et les modifications de prix sont réservés aux administrateurs ; le client consulte les options appliquées dans ses lignes de devis habituelles. Vérifications : `node tests/tariff-addons-ui.cjs` et `tests/tariff-addons.sql` (fixtures annulées par rollback).
