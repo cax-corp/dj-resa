@@ -1574,3 +1574,7 @@ body.is-loading .route-progress { display: block; }
 .addon-editor { margin-top:18px; border-top:1px solid var(--border); padding-top:16px; }
 .addon-access-note { margin-top:18px; }
 @media(max-width:600px) { .addon-catalog-item { padding:12px; } .addon-applied { flex-wrap:wrap; } }
+
+@media(max-width:768px) {
+  .topbar > .syntra-brand .brand-logo { width:32px; height:32px; object-fit:contain; }
+}
