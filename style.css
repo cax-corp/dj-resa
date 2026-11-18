@@ -1452,11 +1452,11 @@ body.is-loading .route-progress { display: block; }
 
 /* Original vector logo: black on light surfaces, white on dark surfaces. */
 .syntra-brand { line-height: 0; }
-.brand-logo { display: block; width: 160px; max-width: 100%; height: auto; }
-.topbar > .syntra-brand .brand-logo { width: 144px; }
+.brand-logo { display: block; width: 112px; max-width: 100%; height: auto; }
+.topbar > .syntra-brand .brand-logo { width: 112px; }
 [data-theme="dark"] .brand-logo { filter: brightness(0) invert(1); }
 @media (max-width: 768px) {
   .topbar > .syntra-brand { min-width: 0; }
-  .topbar > .syntra-brand .brand-logo { width: 112px; }
+  .topbar > .syntra-brand .brand-logo { width: 88px; }
 }
 @media print { .brand-logo { filter: none !important; } }
