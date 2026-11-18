@@ -65,18 +65,19 @@ const pid = '20000000-0000-4000-8000-000000000001';
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== 'running'));
     await page.goto(base + '/#/outils/' + pid + '?section=debrief');
-    await page.locator('.tool-tabs a.active').waitFor();
+    await page.locator('.project-tool-launcher a.active').waitFor();
     assert.equal(
       await page.evaluate(
         () => document.getAnimations().filter((a) => a.playState === 'running').length
       ),
       0
     );
-    const bounds = await page.locator('.tool-tabs a.active').boundingBox();
+    const bounds = await page.locator('.project-tool-launcher a.active').boundingBox();
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 375, 'Selected tool stays visible');
     await page.evaluate(() => window.scrollTo(0, 350));
-    const top = await page.locator('.tool-tabs').evaluate((el) => el.getBoundingClientRect().top);
-    assert.ok(top >= 60, 'Sticky tabs clear header');
+    const toolHeight = await page.locator('.project-tool-launcher').evaluate((el) => el.getBoundingClientRect().height);
+    assert.ok(toolHeight <= 145, 'Compact toolbar does not reserve a tall block of tabs');
+    assert.equal(await page.locator('.tool-quick-links').evaluate(el => getComputedStyle(el).position), 'static');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(base + '/#/admin');
     await page.locator('.project-register').waitFor();
@@ -111,7 +112,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
     }
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto(base + '/#/outils/' + pid + '?section=contacts');
-    await page.locator('.tool-tabs').waitFor();
+    await page.locator('.project-tool-launcher').waitFor();
     assert.ok(
       await page.evaluate(() =>
         document.getAnimations().some((animation) => animation.playState === 'running')
@@ -130,7 +131,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
     );
     assert.deepEqual(errors, []);
     console.log(
-      'PASS: light/dark layouts at 360–1440px, keyboard/overlay mobile menu, reduced motion, visible active tabs, sticky navigation, loading completion and readable text contrast'
+      'PASS: light/dark layouts at 360–1440px, keyboard/overlay mobile menu, reduced motion, visible active tool, compact navigation, loading completion and readable text contrast'
     );
   } finally {
     await browser.close();

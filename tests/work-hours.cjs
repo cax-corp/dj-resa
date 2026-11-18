@@ -46,7 +46,7 @@ const base = process.env.TEST_URL || 'http://127.0.0.1:8000';
     const planning = base + '/#/outils/' + pid + '?section=conductor';
     await page.goto(planning);
     await page.getByRole('heading', { name: 'Planning de l’événement' }).waitFor();
-    assert.equal(await page.locator('.tool-tabs a.active').textContent(), 'Planning');
+    assert.equal(await page.locator('.project-tool-launcher a.active').textContent(), 'Planning');
     const add = async (title, start, end, day = 0) => {
       await page.locator('#tool-editor').evaluate((el) => (el.open = true));
       const form = page.locator('#tool-editor-form');

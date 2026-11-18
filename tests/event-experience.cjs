@@ -42,7 +42,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
     await page.getByRole('heading', { name: 'Préparer le mariage', exact: true }).waitFor();
     await page.getByRole('link', { name: 'Ouvrir la fiche de préparation' }).click();
     await page.locator('.event-brief-form').waitFor();
-    assert.equal(await page.locator('.tool-tabs a').first().textContent(), 'Préparation dédiée');
+    assert.equal(await page.locator('.project-tool-launcher .tool-current').textContent(), 'Préparation Mariage');
     assert.equal(await page.locator('[name=cake_song]').count(), 0);
     await page.locator('[name=couple_names]').fill('Ana & Léo');
     await page.locator('[name=ceremony_time]').fill('13:30');

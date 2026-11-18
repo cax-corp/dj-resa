@@ -31,7 +31,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
     };
     const tool = async (section) => {
       await go('outils/' + pid + '?section=' + section);
-      await page.locator('.tool-tabs a.active[href$="section=' + section + '"]').waitFor();
+      await page.locator('.project-tool-launcher a.active[href$="section=' + section + '"]').waitFor();
     };
     const editor = async () => {
       await page.locator('#tool-editor').evaluate((el) => (el.open = true));

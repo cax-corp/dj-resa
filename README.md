@@ -320,3 +320,18 @@ Lorsqu’un côté de la liaison est stéréo et que l’autre sélection désig
 Une paire occupée n’est pas réutilisée et plusieurs variantes valides demandent un choix explicite. Une prise sans groupe ne se voit pas attribuer arbitrairement une voisine : le formulaire propose la sélection manuelle des deux prises, en préremplissant la prise gauche déjà choisie si elle convient. Les erreurs de niveaux micro/ligne/HP restent bloquantes. Le bouton **Recommencer avec des prises mono** permet de revenir à deux sélections mono ; une liaison mono → mono conserve son fonctionnement précédent.
 
 `tests/stereo-selection-ui.cjs` reproduit la sélection Yamaha MASTER OUT JACK stéréo → Ibiza IN Jack L et vérifie la reprise de L+R, l’autre ordre de sélection, le choix R, le sens inverse, le mono, les variantes ambiguës, le flux manuel et la présentation mobile. Les tests purs de paires sont étendus dans `tests/stereo-cables.cjs`.
+
+### Outils opérationnels du projet
+
+Le bouton **Tous les outils** remplace la grande grille et les onglets défilants. Il regroupe les outils en six catégories avec une recherche ; Planning, Invités et Documents restent accessibles directement. Les anciennes URL `#/outils/<projet>?section=...` continuent à fonctionner.
+
+Les 14 nouveaux espaces sont : repas et menus, hébergement, transports et navettes, éclairage, électricité, chargement, animations, photos et vidéos, décoration, accueil et accès, sécurité, autorisations et assurances, objets perdus, consommables. Chaque espace comporte des fiches modifiables, des états dédiés, une recherche, des indicateurs et une impression en checklist. Les brouillons sont conservés dans l’onglet, par compte et par projet.
+
+- Les repas affichent les besoins alimentaires de la liste d’invités sans la modifier.
+- Le chargement importe une fois chaque sélection de matériel. Réimporter ajoute seulement les nouveaux éléments et conserve les quantités, véhicules et caisses déjà personnalisés. L’inventaire et la sélection du projet restent inchangés.
+- L’électricité estime la charge de chaque circuit en monophasé, signale les puissances inconnues et les dépassements. Elle ne valide pas la conformité d’une installation.
+- Les hébergements et transports signalent les capacités insuffisantes ; les consommables calculent les quantités manquantes après consommation.
+
+Déployer `db/project-operations.sql` avant les nouveaux scripts. Cette migration ajoute une table isolée avec RLS et vérifie par empreinte que toutes les tables existantes sont inchangées. Les règles d’accès des opérations existantes s’appliquent : administrateur, client propriétaire et équipe affectée selon ses droits ; aucune exposition anonyme ni ajout automatique aux liens publics. Les modifications concurrentes sont détectées par révision.
+
+Validation : `node tests/project-operations-ui.cjs` ; exécuter `tests/project-operations.sql` dans une transaction (les fixtures sont annulées en fin de script).

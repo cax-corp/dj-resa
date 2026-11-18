@@ -65,7 +65,7 @@ window.supabase={createClient:()=>({
     await page.locator('.project-register').waitFor();
     const tool = async (section) => {
       await page.goto(base + '/#/outils/' + pid + '?section=' + section);
-      await page.locator('.tool-tabs a.active[href$="section=' + section + '"]').waitFor();
+      await page.locator('.project-tool-launcher a.active[href$="section=' + section + '"]').waitFor();
     };
     const editor = async () => {
       await page.locator('#tool-editor').evaluate((el) => (el.open = true));

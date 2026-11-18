@@ -18,7 +18,7 @@ const base = process.env.TEST_URL || 'http://127.0.0.1:8000';
     );
     const tool = async (section) => {
       await page.goto(base + '/#/outils/' + pid + '?section=' + section);
-      await page.locator('.tool-tabs a.active[href$="section=' + section + '"]').waitFor();
+      await page.locator('.project-tool-launcher a.active[href$="section=' + section + '"]').waitFor();
     };
     await page.goto(base + '/#/materiel');
     await page.locator('[data-audio-catalog="' + sourceId + '"]').click();

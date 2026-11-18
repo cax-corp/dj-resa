@@ -25,7 +25,7 @@
       (node) =>
         node instanceof HTMLElement &&
         node.matches(
-          '.page-head, .stats, .project-register, .grid, .card, .tool-tabs, #tool-content, .project-tool-shortcuts, .event-experience'
+          '.page-head, .stats, .project-register, .grid, .card, .tool-tabs, #tool-content, .project-tool-launcher, .event-experience'
         )
     );
     panels.slice(0, 6).forEach((panel, index) => {

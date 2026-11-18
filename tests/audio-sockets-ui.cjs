@@ -176,7 +176,7 @@ const { mock, pid, sourceId, speakerId } = require("./production-mock.cjs");
       "http://127.0.0.1:8000/#/outils/" + pid + "?section=conductor",
     );
     await page
-      .locator('.tool-tabs a.active[href$="section=conductor"]')
+      .locator('.project-tool-launcher a.active[href$="section=conductor"]')
       .waitFor();
     await page.goto("http://127.0.0.1:8000/#/outils/" + pid + "?section=setup");
     await page.locator("#setup-add-all").click();

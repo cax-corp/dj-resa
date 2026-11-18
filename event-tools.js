@@ -307,50 +307,11 @@ const EventTools = (() => {
     const editable = p._canEdit;
     const experience = p._team ? null : EventExperience.profile(p.event_type);
     const extraSections = Production.sections();
-    const sections = {
-      ...(experience ? { preparation: 'Préparation dédiée' } : {}),
-      guests: 'Invités',
-      requests: 'Demandes musicales',
-      conductor: 'Planning',
-      contacts: 'Contacts',
-      documents: 'Documents',
-      equipment: 'Matériel',
-      venue: 'Lieu',
-      debrief: 'Bilan',
-      ...extraSections,
-    };
-    const adminOnly = ['requests', 'equipment', 'venue', 'debrief'];
-    if (p._team)
-      for (const key of Object.keys(sections))
-        if (
-          ![
-            'guests',
-            'conductor',
-            'contacts',
-            'documents',
-            'seating',
-            'setup',
-            'music_import',
-          ].includes(key)
-        )
-          delete sections[key];
-    if (!sections[section] || (!admin() && adminOnly.includes(section))) section = 'guests';
-    app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, experience ? EventTypes.label(p.event_type) + ' · ' + experience.intro : 'Outils de préparation et de suivi de l’événement')}<div class="tool-tabs" role="navigation" aria-label="Outils du projet">${Object.entries(
-      sections
-    )
-      .filter(([k]) => admin() || !adminOnly.includes(k))
-      .sort(([a], [b]) =>
-        experience
-          ? (experience.order.includes(a) ? experience.order.indexOf(a) : 100) -
-            (experience.order.includes(b) ? experience.order.indexOf(b) : 100)
-          : 0
-      )
-      .map(
-        ([k, label]) =>
-          `<a href="${toolsUrl(id, k)}" class="${k === section ? 'active' : ''}" ${k === section ? 'aria-current="page"' : ''}>${label}</a>`
-      )
-      .join('')}</div><div id="tool-content" aria-live="polite">${empty('Chargement…')}</div>`;
+    const sections = ProjectToolBrowser.available(p.event_type);
+    if (!sections[section]) section = 'guests';
+    app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, experience ? EventTypes.label(p.event_type) + ' · ' + experience.intro : 'Outils de préparation et de suivi de l’événement')}${ProjectToolBrowser.bar(id,p.event_type,section)}<div id="tool-content" aria-live="polite">${empty('Chargement…')}</div>`;
     const reload = () => projectTools(id, section);
+    if (ProjectOperations.tools[section]) return ProjectOperations.open(section, p, reload);
     if (extraSections[section]) return Production.project(section, p, reload);
     if (section === 'preparation') return projectPreparation(p, editable, reload);
     if (section === 'guests') {
@@ -1349,29 +1310,7 @@ const EventTools = (() => {
     outils: ({ b, params }) => projectTools(b, params.get('section') || 'guests'),
   };
   function shortcuts(id, eventType) {
-    return `<section class="project-tool-shortcuts no-print" aria-label="Outils de l’événement">${[
-      ...(me.role !== 'dj' && EventExperience.profile(eventType)
-        ? [['preparation', 'Préparation ' + EventTypes.label(eventType)]]
-        : []),
-      ['guests', 'Invités'],
-      ['conductor', 'Planning'],
-      ['contacts', 'Prestataires'],
-      ['documents', 'Documents'],
-      ...Production.shortcuts(id),
-      ...(admin()
-        ? [
-            ['requests', 'Demandes musicales'],
-            ['equipment', 'Matériel'],
-            ['venue', 'Lieu'],
-            ['debrief', 'Bilan'],
-          ]
-        : []),
-    ]
-      .map(
-        ([section, label]) =>
-          `<a href="${toolsUrl(id, section)}"><span>${label}</span><span aria-hidden="true">→</span></a>`
-      )
-      .join('')}</section>`;
+    return ProjectToolBrowser.bar(id,eventType);
   }
   function navLinks() {
     return [
