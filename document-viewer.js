@@ -50,8 +50,25 @@ const DocumentViewer = (() => {
       if (
         (['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'text/plain'].includes(meta.mime_type) || meta.mime_type.startsWith('audio/') || meta.mime_type.startsWith('video/'))
       ) {
+        if (navigator.userAgent.includes('SyntraAndroid/') && typeof window.__syntraOpenDocument !== 'function') {
+          await new Promise(resolve => {
+            const finish = () => { clearTimeout(timer); window.removeEventListener('syntra:android-ready', finish); resolve(); };
+            const timer = setTimeout(finish, 4000);
+            window.addEventListener('syntra:android-ready', finish, {once:true});
+          });
+          if (signal.aborted) return;
+        }
         const file = new Blob([blob], { type: meta.mime_type });
-        location.replace(URL.createObjectURL(file));
+        const url = URL.createObjectURL(file);
+        if (typeof window.__syntraOpenDocument === 'function') {
+          app.innerHTML = `<section class="card"><h1>${esc(meta.name)}</h1><p>Document prêt à ouvrir dans votre lecteur Android.</p><button class="btn primary" type="button" id="android-open-document">Ouvrir le document</button><a class="btn" href="#/">Retour à l’accueil</a></section>`;
+          const openDocument = () => window.__syntraOpenDocument(url, meta.name);
+          document.getElementById('android-open-document').onclick = openDocument;
+          window.addEventListener('hashchange', () => URL.revokeObjectURL(url), {once:true});
+          openDocument();
+        } else {
+          location.replace(url);
+        }
         return;
       }
       app.innerHTML = `<section class="card"><h1>${esc(meta.name)}</h1><p>Ce format s’ouvre avec une application sur votre appareil.</p><button type="button" class="btn" id="document-download">Télécharger</button></section>`;
