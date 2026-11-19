@@ -19,3 +19,9 @@
 @keyframes syntra-saver-reveal { from { opacity:0; } to { opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .syntra-screensaver { animation:none; } }
 @media print { #screensaver-toggle, .syntra-screensaver { display:none !important; } }
+
+/* Chromatique fills the viewport; ordinary logo styles retain their quiet size. */
+.syntra-screensaver[data-scene="immersive"] { padding:0; overflow:hidden; }
+.syntra-screensaver[data-scene="immersive"] .syntra-screensaver-logo {
+  position:absolute; inset:0; width:100%; max-width:none; height:100%; object-fit:cover;
+}
