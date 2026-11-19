@@ -8,10 +8,11 @@
   animatedIcon.type = 'image/png';
   animatedIcon.sizes = '32x32';
 
-  const frameCount = 24;
-  const cycleMs = 4800;
+  const frameCount = 64;
+  const cycleMs = 8000;
   let framesPromise;
   let timer;
+  let clock;
   let generation = 0;
   let suspended = false;
   let startedAt = 0;
@@ -27,7 +28,7 @@
     if (!framesPromise) {
       framesPromise = (async () => {
         const sprite = new Image();
-        sprite.src = new URL('assets/favicon-contour-sprite.png?v=1', document.baseURI).href;
+        sprite.src = new URL('assets/favicon-contour-sprite.png?v=2', document.baseURI).href;
         await sprite.decode();
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 32;
@@ -60,7 +61,8 @@
 
   function stop() {
     generation++;
-    clearTimeout(timer);
+    clearInterval(timer);
+    if (clock) { clock.terminate(); clock = undefined; }
     timer = undefined;
     animatedIcon.remove();
     // Preserve the original SVG and PNG fallbacks, including their media queries.
@@ -85,10 +87,25 @@
           for (const icon of staticIcons) icon.remove();
           document.head.append(animatedIcon);
         }
-        // Background timers may be throttled: elapsed time keeps the motion in phase.
-        timer = setTimeout(tick, cycleMs / frameCount);
       }
       tick();
+      // Main-thread timers are clamped to ~1 Hz in background Chrome tabs.
+      // A small dedicated clock keeps normal tab switches smoother; the browser
+      // may still suspend workers when saving energy or freezing the page.
+      try {
+        clock = new Worker(new URL('favicon-clock.js?v=1', document.baseURI));
+        clock.onmessage = () => tick();
+        clock.onerror = event => {
+          event.preventDefault();
+          if (token !== generation) return;
+          clock.terminate();
+          clock = undefined;
+          timer = setInterval(tick, 1000);
+        };
+        clock.postMessage('start');
+      } catch {
+        timer = setInterval(tick, 1000);
+      }
     } catch {
       if (token === generation) stop();
     }

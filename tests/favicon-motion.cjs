@@ -18,7 +18,7 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').split('</hea
       const url = new URL(route.request().url());
       if (url.hostname !== 'syntra.test') return route.abort();
       if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: html });
-      if (url.pathname.endsWith('.js') && url.pathname !== '/brand-icons.js') return route.fulfill({ contentType: 'application/javascript', body: '' });
+      if (url.pathname.endsWith('.js') && !['/brand-icons.js', '/favicon-clock.js'].includes(url.pathname)) return route.fulfill({ contentType: 'application/javascript', body: '' });
       const file = path.join(root, url.pathname.slice(1));
       return fs.existsSync(file) ? route.fulfill({ path: file }) : route.abort();
     });
@@ -33,6 +33,12 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').split('</hea
     const waitAnimated = () => page.waitForFunction(() => document.querySelectorAll('link[rel="icon"]').length === 1 && document.querySelector('link[rel="icon"]').href.startsWith('data:image/png'));
     await visibility('hidden');
     await waitAnimated();
+    await page.evaluate(() => {
+      window.frameChanges = [];
+      new MutationObserver(events => {
+        for (const event of events) if (event.attributeName === 'href') window.frameChanges.push(performance.now());
+      }).observe(document.querySelector('link[rel="icon"]'), { attributes: true });
+    });
     const first = (await iconState())[0].href;
     await page.waitForFunction(old => document.querySelector('link[rel="icon"]').href !== old, first);
     async function pixelColour() {
@@ -47,6 +53,13 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').split('</hea
         return { rgb: [...pixels.slice(first, first + 3)], transparentCorner: pixels[3] === 0, coloured };
       });
     }
+    await page.waitForFunction(() => window.frameChanges.length >= 7);
+    const cadence = await page.evaluate(() => {
+      const t = window.frameChanges;
+      return (t[t.length - 1] - t[0]) / (t.length - 1);
+    });
+    assert(cadence < 220, `Worker cadence too slow: ${cadence} ms`);
+    console.log(`Worker cadence in Chromium test: ${Math.round(cadence)} ms between frame updates.`);
     let pixels = await pixelColour();
     assert.deepEqual(pixels.rgb, [0, 0, 0]); assert(pixels.transparentCorner && pixels.coloured > 40);
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -55,6 +68,7 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').split('</hea
     pixels = await pixelColour(); assert.deepEqual(pixels.rgb, [255, 255, 255]);
     assert((await page.locator('#syntra-touch-icon').getAttribute('href')).includes('-dark-180'));
     await visibility('visible'); assert.deepEqual(await iconState(), originals);
+    await page.waitForTimeout(40); assert.equal(page.workers().length, 0, 'Clock must stop on return');
     await page.waitForTimeout(450); assert.deepEqual(await iconState(), originals);
     await page.emulateMedia({ reducedMotion: 'reduce' }); await visibility('hidden');
     await page.waitForTimeout(250); assert.deepEqual(await iconState(), originals);
@@ -66,6 +80,12 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').split('</hea
     await page.route('**/favicon-contour-sprite.png*', route => route.abort());
     await page.reload(); await visibility('hidden'); await page.waitForTimeout(300);
     assert.deepEqual(await iconState(), originals);
+    await page.unroute('**/favicon-contour-sprite.png*');
+    await page.route('**/favicon-clock.js*', route => route.abort());
+    await page.reload(); await visibility('hidden'); await waitAnimated();
+    const fallbackFirst = (await iconState())[0].href;
+    await page.waitForFunction(previous => document.querySelector('link[rel="icon"]').href !== previous, fallbackFirst, { timeout: 3500 });
+    await visibility('visible'); assert.deepEqual(await iconState(), originals);
     assert.deepEqual(errors, []);
     console.log('Favicon motion: frames change; light/dark colours and alpha correct; return restores static icons; reduced motion, page lifecycle and load failure verified.');
   } finally { await browser.close(); }
