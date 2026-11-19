@@ -28,7 +28,7 @@
     if (!framesPromise) {
       framesPromise = (async () => {
         const sprite = new Image();
-        sprite.src = new URL('assets/favicon-contour-sprite.png?v=2', document.baseURI).href;
+        sprite.src = new URL('assets/favicon-sheen-sprite.png?v=1', document.baseURI).href;
         await sprite.decode();
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 32;
