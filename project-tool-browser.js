@@ -44,7 +44,13 @@ const ProjectToolBrowser = (() => {
             debrief: "Bilan",
           }
         : {}),
-      ...ProjectOperations.sections(),
+      ...Object.fromEntries(
+        Object.entries(ProjectOperations.sections()).filter(
+          ([key]) =>
+            me.role === "admin" || !EventCompanion.privateTools.includes(key),
+        ),
+      ),
+      ...EventCompanion.sections(),
     };
   }
   function bar(id, eventType, active) {
@@ -75,15 +81,20 @@ const ProjectToolBrowser = (() => {
       )
       .join(
         "",
-      )}</nav><div id="project-tools-groups" class="tool-browser-groups"></div><p id="project-tools-count" class="muted" role="status"></p>`;
+      )}</nav><div class="actions"><button class="btn small" type="button" id="customize-project-tools">Choisir mes outils et favoris</button><label class="check"><input type="checkbox" id="show-hidden-tools">Afficher aussi mes outils masqués</label></div><div id="project-tools-groups" class="tool-browser-groups"></div><p id="project-tools-count" class="muted" role="status"></p>`;
     document.body.append(dialog);
     let category = "all";
     const render = () => {
       const query = normalize(dialog.querySelector("input").value.trim()),
         matches = Object.entries(sections).filter(([key, title]) => {
           const group =
-            ProjectOperations.tools[key]?.group || groups[key] || "planning";
+            ProjectOperations.tools[key]?.group ||
+            EventCompanion.viewGroups[key] ||
+            groups[key] ||
+            "planning";
           return (
+            (!ToolPreferences.get(id).hidden_tools.includes(key) ||
+              dialog.querySelector("#show-hidden-tools").checked) &&
             (category === "all" || category === group) &&
             (!query ||
               normalize(
@@ -101,6 +112,7 @@ const ProjectToolBrowser = (() => {
             const links = matches.filter(
               ([k]) =>
                 (ProjectOperations.tools[k]?.group ||
+                  EventCompanion.viewGroups[k] ||
                   groups[k] ||
                   "planning") === key,
             );
@@ -127,7 +139,10 @@ const ProjectToolBrowser = (() => {
           render();
         }),
     );
-    dialog.querySelector("input").oninput = render;
+    dialog.querySelector("input[type=search]").oninput = render;
+    dialog.querySelector("#show-hidden-tools").onchange = render;
+    dialog.querySelector("#customize-project-tools").onclick = () =>
+      ToolPreferences.edit(id, bar.dataset.toolType, render);
     dialog.querySelector("[data-close-tools]").onclick = () => dialog.close();
     dialog.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {

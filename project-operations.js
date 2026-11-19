@@ -629,10 +629,11 @@ const ProjectOperations = (() => {
   }
   async function open(key, p, reload) {
     const t = tools[key],
+      table = t.storage || "project_operation_items",
       fields = fieldsFor(key),
       editable = !!p._canEdit;
     const [items, guests] = await Promise.all([
-      list("project_operation_items", { project_id: p.id, tool: key }),
+      list(table, { project_id: p.id, tool: key }),
       key === "meals"
         ? list("project_guests", { project_id: p.id }, "full_name")
         : Promise.resolve([]),
@@ -727,7 +728,7 @@ const ProjectOperations = (() => {
               const x = items.find((x) => x.id === b.dataset.opsDelete);
               await save(
                 sb
-                  .from("project_operation_items")
+                  .from(table)
                   .delete()
                   .eq("id", x.id)
                   .eq("project_id", p.id)
@@ -746,7 +747,7 @@ const ProjectOperations = (() => {
               const x = items.find((x) => x.id === b.dataset.opsNext);
               await save(
                 sb
-                  .from("project_operation_items")
+                  .from(table)
                   .update({
                     status: x.status === "pending" ? "loaded" : "returned",
                     revision: x.revision + 1,
@@ -761,6 +762,7 @@ const ProjectOperations = (() => {
               await reload();
             })),
       );
+      root.companionRefresh?.();
     };
     const form = $("#ops-form");
     function edit(x) {
@@ -840,14 +842,14 @@ const ProjectOperations = (() => {
             };
             const query = id
               ? sb
-                  .from("project_operation_items")
+                  .from(table)
                   .update({ ...payload, revision: revision + 1 })
                   .eq("id", id)
                   .eq("project_id", p.id)
                   .eq("tool", key)
                   .eq("revision", revision)
               : sb
-                  .from("project_operation_items")
+                  .from(table)
                   .insert({ ...payload, project_id: p.id, tool: key });
             await save(query.select("id").single());
             Drafts.finish(draft, true);
@@ -872,6 +874,7 @@ const ProjectOperations = (() => {
           );
           await reload();
         });
+    return { items, root, form };
   }
   async function save(query) {
     const { data, error } = await query;

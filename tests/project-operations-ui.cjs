@@ -44,15 +44,15 @@ c.rpc=async(name,args)=>{if(name!=='import_project_loading')return rpc(name,args
     );
     await page.locator("[data-browse-tools]").click();
     let dialog = page.locator("#project-tools-dialog");
-    assert.equal(await dialog.locator("#project-tools-groups a").count(), 29);
+    assert.equal(await dialog.locator("#project-tools-groups a").count(), 68);
     assert.equal(await dialog.locator(".tool-browser-category").count(), 6);
     await page.screenshot({
       path: "/workspace/work/project-tools-directory.png",
       animations: "disabled",
     });
     await dialog.locator("[data-tool-category=logistics]").click();
-    assert.equal(await dialog.locator("#project-tools-groups a").count(), 6);
-    await dialog.locator("input").fill("hébergement");
+    assert.equal(await dialog.locator("#project-tools-groups a").count(), 13);
+    await dialog.locator("input[type=search]").fill("hébergement");
     assert.equal(await dialog.locator("#project-tools-groups a").count(), 1);
     await dialog.locator("#project-tools-groups a").click();
     await page.locator("#ops-list").waitFor();

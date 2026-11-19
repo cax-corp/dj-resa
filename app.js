@@ -104,6 +104,7 @@ const parseHash = () => {
 
 const navIcon = (name) => {
   const paths = {
+    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
     projects: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     clients: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M15 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2m4 0h2"/>',
@@ -119,7 +120,7 @@ const navIcon = (name) => {
 function renderHeader() {
   const nav = $('#nav');
   const { a, b } = parseHash();
-  const workspace = !!me && !['partage','invites','demande','avis','lecture','rsvp'].includes(a);
+  const workspace = !!me && !['partage','invites','demande','avis','lecture','rsvp','infos'].includes(a);
   document.body.dataset.workspace = String(workspace);
   $('#logout').classList.toggle('hidden', !me);
   if (!workspace) { nav.innerHTML = ''; return; }
@@ -145,6 +146,7 @@ async function route() {
   document.body.dataset.view = '';
   try {
     const parsed = parseHash();
+    if(parsed.a==='infos' && parsed.b){renderHeader();return await EventCompanion.publicInfo(parsed.b);}
     if(parsed.a==='rsvp' && parsed.b){renderHeader();return await Production.publicRsvp(parsed.b);}
     if(parsed.a==='lecture' && parsed.b){renderHeader();return await DocumentViewer.open({token:parsed.b});}
     if (parsed.a === 'partage' && parsed.b) {
@@ -170,6 +172,7 @@ async function route() {
 }
 
 async function dispatch({ a, b, c, params }) {
+  if(a==='recherche')return EventSearch.open(null,params.get('q')||'');
   if(a==='document' && b)return DocumentViewer.open({id:b});
   if (EventTools.pages[a]) return EventTools.pages[a]({a,b,c,params});
   if (a === 'compte') return renderAccount();

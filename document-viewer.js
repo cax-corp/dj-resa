@@ -48,9 +48,7 @@ const DocumentViewer = (() => {
       if (signal.aborted) return;
       // Let the browser handle its native formats in the whole tab, without a site viewer.
       if (
-        ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'text/plain'].includes(
-          meta.mime_type
-        )
+        (['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'text/plain'].includes(meta.mime_type) || meta.mime_type.startsWith('audio/') || meta.mime_type.startsWith('video/'))
       ) {
         const file = new Blob([blob], { type: meta.mime_type });
         location.replace(URL.createObjectURL(file));
@@ -63,5 +61,5 @@ const DocumentViewer = (() => {
       app.innerHTML = `<section class="card"><h1>Document indisponible</h1><p>${esc(error.message)}</p><a class="btn" href="#/">Retour à l’accueil</a></section>`;
     }
   }
-  return { shareURL, privateURL, downloadPrivate, open };
+  return { shareURL, privateURL, downloadPrivate, open, readPrivate: (doc) => api({document_id:doc.id}) };
 })();

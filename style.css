@@ -1578,3 +1578,76 @@ body.is-loading .route-progress { display: block; }
 @media(max-width:768px) {
   .topbar > .syntra-brand .brand-logo { width:32px; height:32px; object-fit:contain; }
 }
+
+/* Connected event workbench. */
+.companion-panel { margin-bottom:22px; }
+.companion-panel:empty { display:none; }
+.companion-panel > .card,.companion-summary { margin:16px 0; }
+.companion-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin:20px 0; }
+.companion-result { padding:14px 0; border-bottom:1px solid var(--border); }
+.companion-result input { width:100%; }
+.companion-result .actions { margin-top:8px; }
+.companion-preserve { white-space:pre-wrap; }
+.companion-simple-list { list-style:none; }
+.companion-simple-list li { padding:10px 0; border-bottom:1px solid var(--border); overflow-wrap:anywhere; }
+.companion-simple-list a { text-decoration:underline; text-underline-offset:3px; }
+.companion-ack { margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+.companion-live-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
+.companion-live-head time { font-variant-numeric:tabular-nums; font-size:34px; }
+.companion-search-form { display:flex; align-items:end; gap:14px; margin-bottom:14px; }
+.companion-search-form label:first-child { flex:1; }
+.companion-search-form input,.companion-search-form select { width:100%; }
+.companion-search-result { margin-top:12px; }
+.companion-search-result h3 { margin:8px 0; padding:0; border:0; }
+.companion-connectors { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; margin-top:16px; }
+.companion-connectors article { padding:14px; border:1px solid var(--border); border-radius:6px; }
+.companion-connectors article svg { display:block; margin-bottom:10px; }
+.companion-connectors article strong { display:block; }
+.companion-connectors article p { font-size:12px; margin-top:8px; }
+.regie-clock { text-align:center; }
+#regie-wall-clock { font-size:22px; color:var(--text-light); }
+#regie-timer { display:block; font-variant-numeric:tabular-nums; font-size:clamp(36px,9vw,96px); margin:24px 0; }
+#regie-timer.clock-finished { color:var(--ko); }
+.tool-preference-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:20px 0; }
+.tool-preference-list > div { border:1px solid var(--border); border-radius:5px; padding:12px; }
+.tool-preference-list label { margin:5px 0; }
+.settings-preset-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin:18px 0; }
+.settings-preset-list .btn { margin:5px 5px 0 0; }
+.settings-editor { margin-top:20px; scroll-margin-top:90px; }
+.virtual-control-board > section { border-top:1px solid var(--border); padding:16px 0; }
+.knob-group { display:grid; grid-template-columns:repeat(auto-fill,minmax(135px,1fr)); gap:14px; }
+.setting-control { display:flex; flex-direction:column; align-items:center; gap:10px; padding:16px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg-alt); min-width:0; }
+.setting-control label { font-size:13px; font-weight:600; text-align:center; overflow-wrap:anywhere; }
+.setting-control input[type=range] { width:100%; min-height:30px; padding:0; accent-color:var(--accent); }
+.setting-fader input[type=range] { writing-mode:vertical-lr; direction:rtl; height:100px; width:32px; }
+.setting-control select { width:100%; }
+.setting-control output { font-variant-numeric:tabular-nums; font-size:13px; }
+.virtual-knob { width:64px; height:64px; border-radius:50%; border:2px solid var(--border-strong); background:var(--bg); position:relative; box-shadow:0 3px 8px #0002; touch-action:none; cursor:ns-resize; }
+.virtual-knob::after { content:''; position:absolute; inset:-6px; border:1px dashed var(--text-lighter); border-radius:50%; pointer-events:none; }
+.virtual-knob span { position:absolute; inset:0; transform:rotate(var(--knob-angle)); }
+.virtual-knob span::after { content:''; position:absolute; top:5px; left:calc(50% - 2px); width:4px; height:19px; border-radius:2px; background:var(--accent); }
+.settings-control-dialog { margin:auto; width:min(620px,calc(100% - 24px)); max-height:90dvh; overflow:auto; padding:24px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--text); }
+.settings-control-dialog::backdrop { background:#0009; }
+.settings-control-dialog h2 { margin-bottom:18px; }
+.paper-labels { display:grid; gap:5mm; }
+.paper-labels > div { border:1px dashed #666; padding:5mm; min-height:20mm; break-inside:avoid; }
+.paper-labels strong,.paper-labels small { display:block; }
+.paper-settings { display:grid; grid-template-columns:repeat(4,1fr); gap:5mm; }
+.paper-settings > div { text-align:center; padding:4mm; border:1px solid #aaa; break-inside:avoid; }
+.paper-settings strong,.paper-settings span,.paper-settings b { display:block; }
+.paper-potard { width:13mm; height:13mm; border:1px solid #000; border-radius:50%; margin:3mm auto; }
+.paper-potard i { display:block; position:relative; height:100%; }
+.paper-potard i::before { content:''; position:absolute; left:50%; top:1mm; height:4mm; width:.6mm; background:#000; }
+.paper-sign { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-height:240mm; break-after:page; }
+.paper-sign h1 { font-size:50pt; }
+.paper-sign p { font-size:24pt; white-space:pre-wrap; }
+.paper-sign strong { font-size:90pt; }
+@media(max-width:700px) { .companion-grid { grid-template-columns:1fr; } .companion-search-form { flex-wrap:wrap; } .companion-search-form label:first-child { flex-basis:100%; } .tool-preference-list { grid-template-columns:1fr; } .knob-group { grid-template-columns:repeat(2,minmax(0,1fr)); } .settings-control-dialog { padding:16px; } }
+@media print { .companion-print { color:#000; } .companion-print .card { border:0; padding:0; margin:5mm 0; } .companion-print .muted { color:#333; } .settings-control-dialog { display:none!important; } }
+.companion-record-time { display:block; font-size:11px; margin-top:14px; }
+@media print {
+  @page syntra-sign-portrait { size:A4 portrait; margin:12mm; }
+  @page syntra-sign-landscape { size:A4 landscape; margin:12mm; }
+  .paper-sign-portrait { page:syntra-sign-portrait; }
+  .paper-sign-landscape { page:syntra-sign-landscape; min-height:160mm; }
+}

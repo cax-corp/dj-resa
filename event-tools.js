@@ -311,6 +311,7 @@ const EventTools = (() => {
     if (!sections[section]) section = 'guests';
     app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, experience ? EventTypes.label(p.event_type) + ' · ' + experience.intro : 'Outils de préparation et de suivi de l’événement')}${ProjectToolBrowser.bar(id,p.event_type,section)}<div id="tool-content" aria-live="polite">${empty('Chargement…')}</div>`;
     const reload = () => projectTools(id, section);
+    if (EventCompanion.handles(section)) return EventCompanion.open(section,p,reload);
     if (ProjectOperations.tools[section]) return ProjectOperations.open(section, p, reload);
     if (extraSections[section]) return Production.project(section, p, reload);
     if (section === 'preparation') return projectPreparation(p, editable, reload);
@@ -1314,6 +1315,7 @@ const EventTools = (() => {
   }
   function navLinks() {
     return [
+      ['recherche', 'Rechercher', 'search'],
       ['calendrier', 'Calendrier', 'calendar'],
       ['taches', 'À faire', 'tasks'],
       ...(admin() ? [['equipe', 'Équipe', 'clients']] : []),
