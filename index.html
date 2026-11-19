@@ -19,6 +19,8 @@
   </script>
   <link rel="stylesheet" href="style.css?v=31">
   <link rel="stylesheet" href="brand-theme.css?v=3">
+  <link rel="stylesheet" href="screensaver.css?v=1">
+  <script src="screensaver.js?v=1" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -35,6 +37,9 @@
   <div class="workspace-breadcrumb"><span>Espace de travail</span><span aria-hidden="true">/</span><strong id="workspace-section">Projets</strong></div>
   <div class="top-actions">
     <span id="workspace-date" class="workspace-date"></span>
+    <button id="screensaver-toggle" class="icon-btn" type="button" aria-label="Activer l’écran de veille" title="Écran de veille" aria-expanded="false" aria-controls="syntra-screensaver">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M12 7l.8 2.2L15 10l-2.2.8L12 13l-.8-2.2L9 10l2.2-.8L12 7Z"/></svg>
+    </button>
     <button id="theme-toggle" class="icon-btn" aria-label="Changer le thème"></button>
     <button id="logout" class="btn small hidden">Déconnexion</button>
   </div>
@@ -43,6 +48,9 @@
   <button class="menu-scrim" id="menu-scrim" aria-label="Fermer la navigation" tabindex="-1" hidden></button>
   <div class="route-progress" aria-hidden="true"></div>
   <main id="app" class="container" tabindex="-1"></main>
+  <div id="syntra-screensaver" class="syntra-screensaver" role="dialog" aria-modal="true" aria-label="Écran de veille Syntra. Cliquez pour revenir à la page." tabindex="-1" hidden>
+    <img class="syntra-screensaver-logo" src="assets/syntra-screensaver.svg?v=1" width="285.027" height="102" alt="Syntra — A CAX CORPORATION SOFTWARE" draggable="false">
+  </div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script src="vendor/qrcode.js?v=1.4.4" defer></script>

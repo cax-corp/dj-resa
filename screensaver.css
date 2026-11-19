@@ -1,0 +1,21 @@
+/* A quiet, vector-only presentation, independent of the workspace colour scheme. */
+.syntra-screensaver[hidden] { display:none !important; }
+.syntra-screensaver {
+  position:fixed; inset:0; z-index:2147483647;
+  width:100%; height:100%; height:100dvh;
+  display:grid; place-items:center; margin:0; padding:24px;
+  background:#000; color:#fff; border:0; outline:0;
+  cursor:default; touch-action:none; user-select:none;
+  animation:syntra-saver-reveal .35s ease-out both;
+}
+.syntra-screensaver::backdrop { background:#000; }
+.syntra-screensaver:fullscreen { width:100%; height:100%; background:#000; }
+.syntra-screensaver-logo {
+  display:block; width:clamp(172px,18vw,248px); max-width:65vw; height:auto;
+  pointer-events:none; -webkit-user-drag:none;
+}
+#screensaver-toggle { flex-shrink:0; }
+#screensaver-toggle svg { width:18px; height:18px; display:block; }
+@keyframes syntra-saver-reveal { from { opacity:0; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .syntra-screensaver { animation:none; } }
+@media print { #screensaver-toggle, .syntra-screensaver { display:none !important; } }
