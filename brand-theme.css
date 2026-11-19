@@ -221,3 +221,12 @@
   .tool-category-open:hover { box-shadow:inset 0 0 0 1px var(--group-color); }
   .tool-browser-groups[data-focused="true"] { grid-template-columns:minmax(0,1fr); }
 }
+
+/* Selected 2C lockup: allow room for the corporation signature. */
+@media screen {
+  .sidebar-brand .brand-logo { width:176px; }
+  .topbar > .syntra-brand .brand-logo { width:160px; }
+}
+@media screen and (max-width:768px) {
+  .topbar > .syntra-brand .brand-logo { width:32px; height:32px; object-fit:contain; }
+}
