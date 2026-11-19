@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '..');
     await page.route('**/*', route=>{
       const url = new URL(route.request().url());
       if(url.hostname!=='syntra.test') return route.abort();
-      if(url.pathname.endsWith('.js') && url.pathname!=='/screensaver.js') return route.fulfill({contentType:'application/javascript',body:''});
+      if(url.pathname.endsWith('.js') && !['/screensaver.js','/brand-motion.js'].includes(url.pathname)) return route.fulfill({contentType:'application/javascript',body:''});
       const file=path.join(root,url.pathname==='/'?'index.html':url.pathname.slice(1));
       return fs.existsSync(file)?route.fulfill({path:file}):route.abort();
     });

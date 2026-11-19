@@ -301,6 +301,7 @@ async function renderAccount() {
         </form>
       </section>
     </div>
+    ${BrandMotion.settings()}
     ${isAdmin ? settingsBlock(settings) + ratesBlock(plans, parseHash().params.get('type') || '') + '<section class="card addon-catalog-panel" id="tariff-addons-catalog"></section>' : ''}`;
 
   $('#acc-form').onsubmit = async (e) => {

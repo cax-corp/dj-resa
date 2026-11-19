@@ -77,10 +77,10 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').split('</hea
     await page.evaluate(() => dispatchEvent(new Event('pageshow'))); await waitAnimated();
     await visibility('visible');
     // A failed sprite load must leave all original favicon fallbacks intact.
-    await page.route('**/favicon-sheen-sprite.png*', route => route.abort());
+    await page.route('**/motion/sheen-sprite.png*', route => route.abort());
     await page.reload(); await visibility('hidden'); await page.waitForTimeout(300);
     assert.deepEqual(await iconState(), originals);
-    await page.unroute('**/favicon-sheen-sprite.png*');
+    await page.unroute('**/motion/sheen-sprite.png*');
     await page.route('**/favicon-clock.js*', route => route.abort());
     await page.reload(); await visibility('hidden'); await waitAnimated();
     const fallbackFirst = (await iconState())[0].href;

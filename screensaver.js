@@ -33,8 +33,19 @@
     }
   }
 
+  function applyAnimation() {
+    if (typeof BrandMotion === 'undefined') return;
+    screen.querySelector('img').src = BrandMotion.asset(BrandMotion.get('screensaver'), 'logo');
+  }
+  applyAnimation();
+  document.addEventListener('syntra:motion-change', event => {
+    if (event.detail.scope === 'screensaver') applyAnimation();
+  });
+  document.addEventListener('syntra:open-screensaver', open);
+
   function open() {
     if (active) return;
+    applyAnimation();
     active = true;
     previousFocus = document.activeElement;
     previousOverflow = document.body.style.overflow;

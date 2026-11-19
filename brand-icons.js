@@ -10,7 +10,7 @@
 
   const frameCount = 64;
   const cycleMs = 8000;
-  let framesPromise;
+  const framesPromises = new Map();
   let timer;
   let clock;
   let generation = 0;
@@ -24,11 +24,11 @@
   }
 
   // Decode a small sprite once, then cache both colours. No canvas work in the timer.
-  function prepareFrames() {
-    if (!framesPromise) {
-      framesPromise = (async () => {
+  function prepareFrames(mode) {
+    if (!framesPromises.has(mode)) {
+      const promise = (async () => {
         const sprite = new Image();
-        sprite.src = new URL('assets/favicon-sheen-sprite.png?v=1', document.baseURI).href;
+        sprite.src = new URL(`assets/motion/${mode}-sprite.png?v=1`, document.baseURI).href;
         await sprite.decode();
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 32;
@@ -48,11 +48,12 @@
         }
         return frames;
       })().catch(error => {
-        framesPromise = undefined;
+        framesPromises.delete(mode);
         throw error;
       });
+      framesPromises.set(mode, promise);
     }
-    return framesPromise;
+    return framesPromises.get(mode);
   }
 
   function shouldAnimate() {
@@ -76,7 +77,8 @@
     if (!shouldAnimate()) return;
     const token = generation;
     try {
-      const frames = await prepareFrames();
+      const mode = typeof BrandMotion === 'undefined' ? 'sheen' : BrandMotion.get('favicon');
+      const frames = await prepareFrames(mode);
       if (token !== generation || !shouldAnimate()) return;
       startedAt = performance.now();
       function tick() {
@@ -111,6 +113,7 @@
     }
   }
 
+  document.addEventListener('syntra:motion-change', event => { if(event.detail.scope === 'favicon') sync(); });
   update();
   document.addEventListener('visibilitychange', sync);
   reducedMotion.addEventListener('change', sync);
