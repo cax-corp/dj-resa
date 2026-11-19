@@ -12,7 +12,7 @@ const root=path.resolve(__dirname,'..');
    document.getElementById('syntra-screensaver').requestFullscreen=()=>Promise.reject(new Error('Test fallback'));
   });
   await p.goto('http://syntra.test/#/compte');await mount();
-  assert.equal(await p.locator('[data-brand-motion]').count(),21);
+  assert.equal(await p.locator('[data-brand-motion]').count(),23);
   assert.equal(await p.locator('[data-brand-motion]:checked').count(),2);
   const modes=['sheen','contour','breathe','scan','duet','reveal','line-draw','line-flow','line-build','line-wave'];
   for(const mode of modes){
@@ -23,7 +23,7 @@ const root=path.resolve(__dirname,'..');
    await p.evaluate(()=>{window.testVisibility='visible';document.dispatchEvent(new Event('visibilitychange'));});
    assert.equal(await p.locator('link[rel="icon"]').count(),3);
   }
-  for(const mode of [...modes,'immersive']){
+  for(const mode of [...modes,'immersive','polychrome','kinetic']){
    await p.locator(`[data-brand-motion="screensaver"][value="${mode}"]`).check();
    await p.locator('[data-test-screensaver]').click();
    assert(await p.locator('#syntra-screensaver').isVisible());
@@ -34,7 +34,7 @@ const root=path.resolve(__dirname,'..');
   assert.equal(await p.locator('#draft').inputValue(),'Brouillon intact');
   await p.reload();await mount();
   assert.equal(await p.locator('[data-brand-motion="favicon"]:checked').inputValue(),'line-wave');
-  assert.equal(await p.locator('[data-brand-motion="screensaver"]:checked').inputValue(),'immersive');
+  assert.equal(await p.locator('[data-brand-motion="screensaver"]:checked').inputValue(),'kinetic');
   await p.evaluate(()=>dispatchEvent(new StorageEvent('storage',{key:'syntra.motion.screensaver',newValue:'contour'})));
   assert.equal(await p.locator('[data-brand-motion="screensaver"]:checked').inputValue(),'contour');
   await p.evaluate(()=>dispatchEvent(new StorageEvent('storage',{key:'syntra.motion.favicon',newValue:'invalid'})));

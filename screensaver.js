@@ -36,7 +36,7 @@
   function applyAnimation() {
     if (typeof BrandMotion === 'undefined') return;
     const mode = BrandMotion.get('screensaver');
-    screen.dataset.scene = mode === 'immersive' ? 'immersive' : 'logo';
+    screen.dataset.scene = BrandMotion.isScene(mode) ? 'immersive' : 'logo';
     screen.querySelector('img').src = BrandMotion.asset(mode, 'logo');
   }
   applyAnimation();

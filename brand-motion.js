@@ -11,7 +11,9 @@ const BrandMotion = (() => {
     {id:'line-flow', name:'Lignes défilantes', description:'Des segments blancs parcourent les tracés.'},
     {id:'line-build', name:'Assemblage', description:'Les lignes se séparent, puis retrouvent leur place.'},
     {id:'line-wave', name:'Ondulation', description:'Une vague légère traverse les traits du logo.'},
-    {id:'immersive', name:'Chromatique', scope:'screensaver', scene:true, description:'Des rubans colorés occupent tout l’écran, avec le logo au centre.'}
+    {id:'immersive', name:'Chromatique', scope:'screensaver', scene:true, description:'Des rubans colorés occupent tout l’écran, avec le logo au centre.'},
+    {id:'polychrome', name:'Pride', scope:'screensaver', scene:true, description:'Une édition multicolore pour la Pride : courbes, mosaïque et diagonales.'},
+    {id:'kinetic', name:'Cinétique', scope:'screensaver', scene:true, description:'Trois minutes de motion design : assemblages, géométrie et accélérations, en ivoire et corail.'}
   ];
   const valid = (value,scope) => modes.some(mode => mode.id === value && (!scope || !mode.scope || mode.scope === scope));
   const key = scope => `syntra.motion.${scope}`;
@@ -56,5 +58,6 @@ const BrandMotion = (() => {
     }
     refresh();
   });
-  return {modes,get,set,asset,settings};
+  const isScene = mode => modes.some(item => item.id === mode && item.scene);
+  return {modes,get,set,asset,settings,isScene};
 })();
