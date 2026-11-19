@@ -310,7 +310,7 @@ const EventTools = (() => {
     const extraSections = Production.sections();
     const sections = ProjectToolBrowser.available(p.event_type);
     if (!sections[section]) section = 'guests';
-    app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, experience ? EventTypes.label(p.event_type) + ' · ' + experience.intro : 'Outils de préparation et de suivi de l’événement')}${ProjectToolBrowser.bar(id,p.event_type,section)}<div id="tool-content" aria-live="polite">${empty('Chargement…')}</div>`;
+    app.innerHTML = `<a class="back" href="${projectUrl(id)}">← Retour au projet</a>${head(p.title, experience ? EventTypes.label(p.event_type) + ' · ' + experience.intro : 'Outils de préparation et de suivi de l’événement')}${ProjectToolBrowser.bar(id,p.event_type,section)}<div id="tool-content" data-tool-group="${ProjectToolBrowser.groupFor(section)}" aria-live="polite">${empty('Chargement…')}</div>`;
     const reload = () => projectTools(id, section);
     if (EventCompanion.handles(section)) return EventCompanion.open(section,p,reload);
     if (ProjectOperations.tools[section]) return ProjectOperations.open(section, p, reload);

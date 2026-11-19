@@ -169,7 +169,7 @@ const ToolPreferences = (() => {
         .slice(0, 4)
         .map(
           (k) =>
-            `<a href="#/outils/${id}?section=${k}">${esc(available[k])}</a>`,
+            `<a data-tool-group="${ProjectToolBrowser.groupFor(k)}" href="#/outils/${id}?section=${k}">${esc(available[k])}</a>`,
         )
         .join("");
   }

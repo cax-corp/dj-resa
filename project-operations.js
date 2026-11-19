@@ -695,11 +695,11 @@ const ProjectOperations = (() => {
                 .filter((k) => x.details[k] != null && x.details[k] !== "")
                 .map((k) => {
                   const f = fields.find((f) => f.key === k);
-                  return esc(f.label) + " : " + esc(display(f, x.details[k]));
+                  return `<span class="ops-summary-part"><span class="ops-summary-key">${esc(f.label)}</span><span class="ops-summary-value">${esc(display(f,x.details[k]))}</span></span>`;
                 })
                 .join(
-                  " · ",
-                )}</p></div><span class="ops-state">${esc(t.status[x.status])}</span></div><div class="ops-alerts">${warnings(key, x)}</div><details class="ops-item-details"><summary>Détails</summary><dl class="ops-details">${fields
+                  "",
+                )}</p></div><span class="ops-state" data-state="${esc(x.status)}">${esc(t.status[x.status])}</span></div><div class="ops-alerts">${warnings(key, x)}</div><details class="ops-item-details"><summary>Détails</summary><dl class="ops-details">${fields
                 .filter(
                   (f) => x.details[f.key] != null && x.details[f.key] !== "",
                 )

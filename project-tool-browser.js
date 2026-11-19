@@ -25,6 +25,7 @@ const ProjectToolBrowser = (() => {
     profit: "tracking",
     debrief: "tracking",
   };
+  const groupFor = key => ProjectOperations.tools[key]?.group || EventCompanion.viewGroups[key] || groups[key] || 'planning';
   const url = (id, key) => `#/outils/${encodeURIComponent(id)}?section=${key}`;
   function available(eventType) {
     return {
@@ -56,7 +57,7 @@ const ProjectToolBrowser = (() => {
   function bar(id, eventType, active) {
     const sections = available(eventType),
       quick = ["conductor", "guests", "documents"].filter((k) => k !== active);
-    return `<section class="project-tool-launcher no-print" data-tool-project="${esc(id)}" data-tool-type="${esc(eventType || "")}" aria-label="Outils du projet"><div class="tool-launcher-title"><span class="eyebrow">Outils du projet</span>${active ? `<a class="active tool-current" aria-current="page" href="${url(id, active)}">${esc(sections[active] || "Outils")}</a>` : '<span class="muted tool-launcher-hint">Préparer, organiser et suivre</span>'}</div><nav class="tool-quick-links" aria-label="Accès rapides">${quick.map((k) => `<a href="${url(id, k)}">${esc(sections[k])}</a>`).join("")}</nav><button class="btn" type="button" data-browse-tools aria-haspopup="dialog">Tous les outils <span class="tool-count">${Object.keys(sections).length}</span><span aria-hidden="true">⌕</span></button></section>`;
+    return `<section class="project-tool-launcher no-print" data-tool-project="${esc(id)}" data-tool-type="${esc(eventType || "")}" data-tool-group="${active ? groupFor(active) : 'planning'}" aria-label="Outils du projet"><div class="tool-launcher-title"><span class="eyebrow">${active ? esc(categories[groupFor(active)][0]) : 'Outils du projet'}</span>${active ? `<a class="active tool-current" aria-current="page" href="${url(id, active)}">${esc(sections[active] || "Outils")}</a>` : '<span class="muted tool-launcher-hint">Préparer, organiser et suivre</span>'}</div><nav class="tool-quick-links" aria-label="Accès rapides">${quick.map((k) => `<a data-tool-group="${groupFor(k)}" href="${url(id, k)}">${esc(sections[k])}</a>`).join("")}</nav><button class="btn" type="button" data-browse-tools aria-haspopup="dialog">Tous les outils <span class="tool-count">${Object.keys(sections).length}</span><span aria-hidden="true">⌕</span></button></section>`;
   }
   const normalize = (s) =>
     s
@@ -117,13 +118,20 @@ const ProjectToolBrowser = (() => {
                   "planning") === key,
             );
             return links.length
-              ? `<section class="tool-browser-category"><h3>${ProjectIcons.svg(icon, 18)}${esc(title)}</h3><div>${links.map(([k, title]) => `<a href="${url(id, k)}" ${current === url(id, k) ? 'aria-current="page"' : ""}>${esc(title)}<span aria-hidden="true">→</span></a>`).join("")}</div></section>`
+              ? `<section class="tool-browser-category" data-tool-group="${key}" ${category==='all'&&!query?'data-compact="true"':''}><h3>${ProjectIcons.svg(icon, 18)}${esc(title)}<span class="tool-category-size">${links.length}</span></h3><div>${links.map(([k, title]) => `<a href="${url(id, k)}" ${current === url(id, k) ? 'aria-current="page"' : ""}>${esc(title)}<span aria-hidden="true">→</span></a>`).join("")}</div>${category==='all'&&!query&&links.length>2?`<button type="button" class="tool-category-open" data-open-category="${key}">Voir les ${links.length} outils <span aria-hidden="true">→</span></button>`:''}</section>`
               : "";
           })
           .join("") ||
         '<p class="empty">Aucun outil trouvé. Essayez un autre mot ou une autre catégorie.</p>';
+      dialog.querySelector('#project-tools-groups').dataset.focused=String(category!=='all');
+      dialog.querySelectorAll('[data-open-category]').forEach(button=>button.onclick=()=>{
+        category=button.dataset.openCategory;
+        dialog.querySelectorAll('[data-tool-category]').forEach(x=>{const active=x.dataset.toolCategory===category;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active));});
+        render();
+        dialog.querySelector('#project-tools-groups a')?.focus({preventScroll:true});
+      });
       dialog.querySelector("#project-tools-count").textContent =
-        `${matches.length} outil${matches.length === 1 ? "" : "s"}`;
+        `${matches.length} outil${matches.length === 1 ? "" : "s"}${category==='all'&&!query?' · Choisissez une catégorie ou recherchez un nom.':''}`;
       dialog
         .querySelectorAll("#project-tools-groups a")
         .forEach((a) => (a.onclick = () => dialog.close()));
@@ -174,5 +182,5 @@ const ProjectToolBrowser = (() => {
     const trigger = event.target.closest("[data-browse-tools]");
     if (trigger) show(trigger.closest("[data-tool-project]"), trigger);
   });
-  return { bar, available };
+  return { bar, available, groupFor };
 })();
