@@ -13,7 +13,7 @@ const BrandMotion = (() => {
     {id:'line-wave', name:'Ondulation', description:'Une vague légère traverse les traits du logo.'},
     {id:'immersive', name:'Chromatique', scope:'screensaver', scene:true, description:'Des rubans colorés occupent tout l’écran, avec le logo au centre.'},
     {id:'polychrome', name:'Pride', scope:'screensaver', scene:true, description:'Une édition multicolore pour la Pride : courbes, mosaïque et diagonales.'},
-    {id:'kinetic', name:'Cinétique', scope:'screensaver', scene:true, description:'Trois minutes de motion design : assemblages, géométrie et accélérations, en ivoire et corail.'}
+    {id:'kinetic', name:'Cinétique', scope:'screensaver', scene:true, description:'24 secondes rythmées : lignes qui se courbent, motifs animés et transitions circulaires.'}
   ];
   const valid = (value,scope) => modes.some(mode => mode.id === value && (!scope || !mode.scope || mode.scope === scope));
   const key = scope => `syntra.motion.${scope}`;
@@ -22,7 +22,7 @@ const BrandMotion = (() => {
     try { const value=localStorage.getItem(key(scope)); if (valid(value,scope)) selected[scope]=value; } catch {}
   }
   const get = scope => selected[scope] || 'sheen';
-  const asset = (mode,kind) => `assets/motion/${valid(mode,kind==='mark'?'favicon':'screensaver')?mode:'sheen'}-${kind}.svg?v=1`;
+  const asset = (mode,kind) => `assets/motion/${valid(mode,kind==='mark'?'favicon':'screensaver')?mode:'sheen'}-${kind}.svg?v=${mode==='kinetic'?2:1}`;
   function refresh() {
     document.querySelectorAll('[data-brand-motion]').forEach(input => {
       input.checked=get(input.dataset.brandMotion)===input.value;
