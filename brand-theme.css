@@ -1,0 +1,121 @@
+/* Syntra: the weight and horizontal rules of the wordmark, applied to the workspace.
+   Screen-only layer: printed checklists, labels and invoices keep their existing layout. */
+@media screen {
+  :root {
+    --workspace-bg: #f3f3f1;
+    --bg: #ffffff;
+    --bg-alt: #f6f6f4;
+    --bg-hover: #eeeeeb;
+    --text: #151515;
+    --text-light: #5b5b58;
+    --text-lighter: #6c6c68;
+    --border: #dcdcd6;
+    --border-strong: #b2b2aa;
+    --control-border: #8e8e88;
+    --accent: #141414;
+    --on-accent: #ffffff;
+    --focus-ring: 0 0 0 3px rgb(20 20 20 / 12%);
+    --radius: 6px;
+  }
+  [data-theme="dark"] {
+    --workspace-bg: #111111;
+    --bg: #191919;
+    --bg-alt: #212121;
+    --bg-hover: #2b2b2b;
+    --text: #f5f5f2;
+    --text-light: #c2c2bd;
+    --text-lighter: #adada7;
+    --border: #3a3a36;
+    --border-strong: #64645e;
+    --control-border: #777770;
+    --accent: #f5f5f2;
+    --on-accent: #151515;
+    --focus-ring: 0 0 0 3px rgb(245 245 242 / 17%);
+  }
+
+  h1, h2, h3, h4 { font-family: inherit; }
+  h1 { font-weight: 800; letter-spacing: -.045em; overflow-wrap: anywhere; }
+  h2 { font-weight: 750; letter-spacing: -.025em; }
+  h3 { font-weight: 700; letter-spacing: -.015em; }
+  .page-head { padding-bottom: 20px; border-bottom: 1px solid var(--border-strong); margin-bottom: 26px; }
+  .page-head > div:first-child { min-width: 0; }
+  .page-head h1 { margin-bottom: 8px; }
+  .eyebrow { color: var(--text-light); font-weight: 700; letter-spacing: .1em; }
+  .page-head .eyebrow::before {
+    content: ""; display: inline-block; width: 15px; height: 8px;
+    border-top: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    margin-right: 8px; vertical-align: 1px;
+  }
+
+  .card, .project-register, .row-card { border-radius: 6px; }
+  .card { box-shadow: none; }
+  .card h2 { border-bottom-color: var(--border-strong); }
+  .btn, .icon-btn { border-radius: 4px; }
+  .btn { font-weight: 650; }
+  .btn.primary { font-weight: 750; background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .btn.primary:hover { background: var(--text); box-shadow: none; }
+  .btn:not(.primary):not(.danger):hover, .icon-btn:hover { border-color: var(--accent); }
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]):not([type="file"]):not([type="color"]), select, textarea) {
+    border-color: var(--control-border); border-radius: 4px; background-color: var(--bg);
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  label { letter-spacing: 0; }
+
+  .sidebar nav a { border-radius: 4px; }
+  .sidebar nav a.active { font-weight: 750; }
+  .sidebar-label { font-weight: 700; letter-spacing: .11em; }
+  .sidebar-footer { border-top-color: var(--border-strong); }
+  .sidebar-footer strong { font-weight: 700; }
+  .workspace-breadcrumb strong { font-weight: 650; }
+  .stats .stat, .stats .stat:nth-child(n) { border-radius: 5px; border-top: 3px solid var(--accent); }
+  .stat strong { font-weight: 800; font-size: clamp(24px, 2.1vw, 32px); letter-spacing: -.035em; overflow-wrap: anywhere; }
+  .stat span { font-weight: 600; }
+  .project-file-icon { background: var(--bg-alt); border-color: var(--border-strong); }
+  .project-row strong { font-weight: 700; letter-spacing: -.01em; }
+  .register-head h2 { font-weight: 750; }
+  .project-list-head { font-weight: 650; border-top-color: var(--border-strong); }
+  .profile-avatar { border-radius: 4px; border-color: var(--border-strong); font-weight: 750; }
+  .status, .tag-base, .project-type-tag { border-radius: 4px; }
+
+  /* A pair of functional rules recalls the bars framing the logo. */
+  .project-tool-launcher {
+    border-left: 0; border-right: 0; border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent);
+    border-radius: 0; padding: 12px 0; background: transparent;
+  }
+  .tool-current { font-weight: 750; letter-spacing: -.01em; }
+  .tool-quick-links a { font-weight: 600; }
+  .tool-count { border-radius: 3px; font-weight: 700; }
+  .project-navigation button.active { font-weight: 750; border-bottom-width: 3px; }
+  .tool-browser-category h3 { padding-top: 10px; border-top: 2px solid var(--accent); font-size: 11px; letter-spacing: .06em; }
+  .tool-browser-category a { border-radius: 4px; }
+  .tool-browser-category a[aria-current] { font-weight: 750; }
+  .tool-category-filter button { border-radius: 4px; font-weight: 600; }
+  .project-tools-dialog, .project-icon-dialog, .settings-control-dialog { border-radius: 9px; }
+  .tool-dialog-head h2 { font-weight: 800; letter-spacing: -.035em; }
+  .experience-brief h2, .event-experience h2 { font-weight: 750; }
+  .event-experience { border-top: 2px solid var(--accent); }
+  .ops-state { border-radius: 3px; font-weight: 650; }
+  .ops-item, .setting-control, .addon-catalog-item { border-radius: 5px; }
+  .tool-metric strong, .production-metrics strong { font-weight: 750; letter-spacing: -.035em; }
+  .guest-sheet-toolbar h2, .tool-toolbar h2 { font-weight: 750; }
+  .guest-sheet-table th { font-weight: 700; background: var(--bg-alt); }
+  .auth { border-top: 3px solid var(--accent); }
+  .auth h1 { font-weight: 800; letter-spacing: -.045em; }
+  .public-page h1 { font-weight: 800; }
+  .toast { border-radius: 5px; }
+}
+
+@media screen and (max-width: 768px) {
+  .page-head { padding-bottom: 16px; margin-bottom: 22px; }
+  .page-head h1 { letter-spacing: -.035em; }
+  .stats .stat, .stats .stat:nth-child(n) { padding: 16px; }
+  .stat strong { font-size: 26px; }
+  .project-tool-launcher { padding: 12px 0; }
+}
+
+@media screen and (max-width: 768px) {
+  .project-tool-launcher { gap:10px; padding:10px 0; }
+  .tool-launcher-title { flex:1 1 100px; }
+  .tool-quick-links { flex-wrap:nowrap; }
+  .tool-quick-links a { flex:1 1 0; min-width:0; padding:7px 6px; font-size:12px; }
+}
