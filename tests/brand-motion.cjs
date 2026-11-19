@@ -12,9 +12,9 @@ const root=path.resolve(__dirname,'..');
    document.getElementById('syntra-screensaver').requestFullscreen=()=>Promise.reject(new Error('Test fallback'));
   });
   await p.goto('http://syntra.test/#/compte');await mount();
-  assert.equal(await p.locator('[data-brand-motion]').count(),12);
+  assert.equal(await p.locator('[data-brand-motion]').count(),20);
   assert.equal(await p.locator('[data-brand-motion]:checked').count(),2);
-  const modes=['sheen','contour','breathe','scan','duet','reveal'];
+  const modes=['sheen','contour','breathe','scan','duet','reveal','line-draw','line-flow','line-build','line-wave'];
   for(const mode of modes){
    await p.locator(`[data-brand-motion="favicon"][value="${mode}"]`).check();
    assert.equal(await p.evaluate(()=>BrandMotion.get('screensaver')),'sheen','Selections must be independent');
@@ -33,8 +33,8 @@ const root=path.resolve(__dirname,'..');
   }
   assert.equal(await p.locator('#draft').inputValue(),'Brouillon intact');
   await p.reload();await mount();
-  assert.equal(await p.locator('[data-brand-motion="favicon"]:checked').inputValue(),'reveal');
-  assert.equal(await p.locator('[data-brand-motion="screensaver"]:checked').inputValue(),'reveal');
+  assert.equal(await p.locator('[data-brand-motion="favicon"]:checked').inputValue(),'line-wave');
+  assert.equal(await p.locator('[data-brand-motion="screensaver"]:checked').inputValue(),'line-wave');
   await p.evaluate(()=>dispatchEvent(new StorageEvent('storage',{key:'syntra.motion.screensaver',newValue:'contour'})));
   assert.equal(await p.locator('[data-brand-motion="screensaver"]:checked').inputValue(),'contour');
   await p.evaluate(()=>dispatchEvent(new StorageEvent('storage',{key:'syntra.motion.favicon',newValue:'invalid'})));
@@ -50,6 +50,6 @@ const root=path.resolve(__dirname,'..');
   assert.equal(await p.evaluate(()=>BrandMotion.get('favicon')),'scan');
   assert((await p.locator('#brand-motion-status').textContent()).includes('session'));
   assert.deepEqual(errors,[]);
-  console.log('Brand motion: six choices per use, all favicon sprites load, all screensaver modes open, independent persistence, storage sync/failure, intact draft and mobile layout verified.');
+  console.log('Brand motion: ten choices per use, all favicon sprites load, all screensaver modes open, independent persistence, storage sync/failure, intact draft and mobile layout verified.');
  }finally{await b.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
