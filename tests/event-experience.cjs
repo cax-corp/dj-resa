@@ -7,10 +7,10 @@ let mock = vm.runInNewContext(source.slice(0, source.lastIndexOf('(async () => {
   require,
   process,
 });
-mock += `\nwindow.testState.db.project_event_briefs=[];
+mock += `\nwindow.testState.db.project_event_briefs=[];window.testState.briefOrders=[];
 const originalCreate=window.supabase.createClient;window.supabase.createClient=(...args)=>{const client=originalCreate(...args),from=client.from,rpc=client.rpc;
 client.from=table=>{if(table!=='project_event_briefs')return from(table);let filters=[],action='select',values,single=false;
-const q={select:()=>q,order:()=>q,range:()=>q,eq:(key,value)=>{filters.push([key,value]);return q},single:()=>{single=true;return q},insert:payload=>{action='insert';values=payload;return q},update:payload=>{action='update';values=payload;return q},then:resolve=>{const db=window.testState.db;let rows=db.project_event_briefs.filter(row=>filters.every(([key,value])=>row[key]===value));let error=null,data=rows;
+const orders=[];const q={select:()=>q,order:key=>{if(!['project_id','event_type','details','revision','created_at','updated_at'].includes(key))throw new Error('column project_event_briefs.'+key+' does not exist');orders.push(key);return q;},range:()=>q,eq:(key,value)=>{filters.push([key,value]);return q},single:()=>{single=true;return q},insert:payload=>{action='insert';values=payload;return q},update:payload=>{action='update';values=payload;return q},then:resolve=>{window.testState.briefOrders.push([...orders]);const db=window.testState.db;let rows=db.project_event_briefs.filter(row=>filters.every(([key,value])=>row[key]===value));let error=null,data=rows;
 if(action==='insert'){if(db.project_event_briefs.some(row=>row.project_id===values.project_id&&row.event_type===values.event_type))error={code:'23505'};else{data={...values,revision:1,created_at:'2026-11-15T10:00:00Z',updated_at:'2026-11-15T10:00:00Z'};db.project_event_briefs.push(data)}}
 if(action==='update'){rows.forEach(row=>Object.assign(row,values,{revision:row.revision+1}));data=rows}
 if(single&&Array.isArray(data)){data=data[0]||null;if(!data)error={code:'PGRST116'}}return Promise.resolve({data:structuredClone(data),error}).then(resolve)}};return q};
@@ -25,6 +25,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
   });
   try {
     const page = await browser.newPage();
+    page.setDefaultTimeout(6000);
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.route('https://cdn.jsdelivr.net/**', (r) =>
@@ -43,6 +44,7 @@ const pid = '20000000-0000-4000-8000-000000000001';
     await page.getByRole('link', { name: 'Ouvrir la fiche de préparation' }).click();
     await page.locator('.event-brief-form').waitFor();
     assert.equal(await page.locator('.project-tool-launcher .tool-current').textContent(), 'Préparation Mariage');
+    assert.deepEqual(await page.evaluate(() => window.testState.briefOrders.at(-1)), ['created_at','project_id','event_type']);
     assert.equal(await page.locator('[name=cake_song]').count(), 0);
     await page.locator('[name=couple_names]').fill('Ana & Léo');
     await page.locator('[name=ceremony_time]').fill('13:30');

@@ -86,7 +86,8 @@ const EventTools = (() => {
       let query = sb.from(table).select(select);
       for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
       if (order) query = query.order(order);
-      if (order !== 'id') query = query.order('id');
+      const keys = table === 'project_event_briefs' ? ['project_id', 'event_type'] : ['id'];
+      for (const key of keys) if (key !== order) query = query.order(key);
       const { data, error } = await query.range(offset, offset + 499);
       if (error) throw error;
       const batch = data || [];
