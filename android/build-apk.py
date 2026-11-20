@@ -2,7 +2,7 @@
 """Build with the official Android SDK and ECJ, then sign with an external private key.
 The ordinary Gradle project can also be opened directly in Android Studio.
 """
-import argparse, pathlib, subprocess, zipfile, xml.etree.ElementTree as ET
+import argparse, pathlib, subprocess, sys, zipfile, xml.etree.ElementTree as ET
 p=argparse.ArgumentParser()
 p.add_argument('--sdk',type=pathlib.Path,required=True)
 p.add_argument('--ecj',type=pathlib.Path,required=True)
@@ -17,14 +17,17 @@ def run(*args):subprocess.run([str(x) for x in args],check=True)
 ET.register_namespace('android','http://schemas.android.com/apk/res/android')
 m=ET.parse(root/'app/src/main/AndroidManifest.xml');m.getroot().set('package','com.caxcorp.syntra');m.write(build/'AndroidManifest.xml',encoding='utf-8')
 run(tools/'aapt2','compile','--dir',root/'app/src/main/res','-o',build/'resources.zip')
-run(tools/'aapt2','link','-o',build/'resources.apk','--manifest',build/'AndroidManifest.xml','-I',android,'--java',build/'generated','--min-sdk-version','26','--target-sdk-version','35','--version-code','1','--version-name','1.0.0','--auto-add-overlay',build/'resources.zip')
+run(tools/'aapt2','link','-o',build/'resources.apk','--manifest',build/'AndroidManifest.xml','-I',android,'--java',build/'generated','--min-sdk-version','26','--target-sdk-version','35','--version-code','2','--version-name','1.0.1','--auto-add-overlay',build/'resources.zip')
 sources=list((root/'app/src/main/java').rglob('*.java'))+list((build/'generated').rglob('*.java'))
 run('java','-jar',a.ecj.resolve(),'-8','-encoding','UTF-8','-warn:none','-classpath',android,'-d',build/'classes',*sources)
 with zipfile.ZipFile(build/'classes.jar','w',zipfile.ZIP_DEFLATED) as z:
  for f in (build/'classes').rglob('*.class'):z.write(f,f.relative_to(build/'classes'))
 run('java','-cp',tools/'lib/d8.jar','com.android.tools.r8.D8','--release','--min-api','26','--lib',android,'--output',build/'dex',build/'classes.jar')
 with zipfile.ZipFile(build/'resources.apk') as original,zipfile.ZipFile(build/'unsigned.apk','w',zipfile.ZIP_DEFLATED) as z:
- for name in original.namelist():z.writestr(name,original.read(name))
+ for name in original.namelist():
+  # Recompressing resources.arsc makes target-30+ APKs uninstallable on Android 11+.
+  method=zipfile.ZIP_STORED if name=='resources.arsc' else original.getinfo(name).compress_type
+  z.writestr(name,original.read(name),compress_type=method)
  for f in (build/'dex').glob('*.dex'):z.write(f,f.name)
  for f in (root/'app/src/main/assets').rglob('*'):
   if f.is_file():z.write(f,'assets/'+str(f.relative_to(root/'app/src/main/assets')))
@@ -32,4 +35,5 @@ run(tools/'zipalign','-f','4',build/'unsigned.apk',build/'aligned.apk')
 a.output.resolve().parent.mkdir(parents=True,exist_ok=True)
 run('java','-jar',tools/'lib/apksigner.jar','sign','--ks',a.keystore.resolve(),'--ks-key-alias','syntra','--ks-pass','file:'+str(a.password_file.resolve()),'--out',a.output.resolve(),build/'aligned.apk')
 run('java','-jar',tools/'lib/apksigner.jar','verify','--verbose',a.output.resolve())
+run(sys.executable, root/'tests/verify-apk.py', a.output.resolve())
 print('APK signé :',a.output.resolve())

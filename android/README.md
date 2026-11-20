@@ -26,7 +26,7 @@ Aucune clé privée de signature ni aucun mot de passe ne fait partie du dépôt
 python3 build-apk.py --sdk /chemin/sdk --ecj /chemin/ecj.jar \
   --keystore /chemin/prive/syntra-release.p12 \
   --password-file /chemin/prive/password.txt \
-  --output /chemin/Syntra-1.0.0.apk
+  --output /chemin/Syntra-1.0.1.apk
 ```
 
 La clé doit avoir l'alias `syntra`. Le fichier de mot de passe reste hors du dépôt. Le script appelle `java`, `aapt2`, D8, `zipalign` et `apksigner` ; aucun secret n'est placé dans les arguments en clair.
@@ -35,6 +35,7 @@ La clé doit avoir l'alias `syntra`. Le fichier de mot de passe reste hors du d�
 
 - Compilation contre le SDK Android 35 et génération DEX pour Android 8.0 minimum.
 - Vérification des signatures APK v2/v3 et des métadonnées du manifeste.
+- `tests/verify-apk.py` : table `resources.arsc` non compressée et alignée sur 4 octets, exigée à l’installation sur Android 11 et suivants.
 - `tests/UrlPolicyTest.java` : frontières d'origine, liens de projet et noms de fichiers.
 - `../tests/android-webview.cjs` : transferts binaires avec accusés de réception, téléchargements, documents, impression, thèmes et veille, avec le canal natif simulé.
 - `../tests/document-viewer.cjs` : ouverture des PDF dans le navigateur ordinaire inchangée.
